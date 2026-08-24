@@ -314,22 +314,21 @@ body {
 
 
 /* ============================================================
-   13. CART BUTTON
+   CART BUTTON - LOGO ONLY
    ============================================================ */
 
 #cart-button {
 
-    min-width: 180px;
+    width: 100px;
+    height: 70px;
 
-    height: 55px;
+    min-width: unset;
 
     border: none;
 
-    border-radius: 30px;
+    border-radius: 12px;
 
-    background-color: #222222;
-
-    color: #ffffff;
+    background-color: #ffffff;
 
     display: flex;
 
@@ -337,63 +336,43 @@ body {
 
     justify-content: center;
 
-    gap: 10px;
-
-    font-size: 17px;
-
-    font-weight: bold;
+    padding: 5px;
 
     cursor: pointer;
 
     box-shadow:
-        0 4px 12px rgba(0, 0, 0, 0.25);
+        0 4px 12px rgba(0, 0, 0, 0.18);
 
 }
 
 
-/* ============================================================
-   14. CART LOGO
-   ============================================================ */
+/* Make the Easy Sales logo fill the button */
 
 .cart-logo {
 
-    width: 38px;
+    width: 100%;
 
-    height: 38px;
+    height: 100%;
 
     object-fit: contain;
 
-    flex-shrink: 0;
-
 }
 
 
-/* ============================================================
-   15. CART COUNTER
-   ============================================================ */
+/* Hide the Cart text and counter visually */
+
+#cart-button span:not(#cart-count) {
+
+    display: none;
+
+}
+
 
 #cart-count {
 
-    min-width: 24px;
-
-    height: 24px;
-
-    border-radius: 50%;
-
-    background-color: #ffffff;
-
-    color: #222222;
-
-    display: flex;
-
-    align-items: center;
-
-    justify-content: center;
-
-    font-size: 13px;
+    display: none;
 
 }
-
 
 /* ============================================================
    16. CART WINDOW
