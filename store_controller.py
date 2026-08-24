@@ -12,10 +12,20 @@ CONTROLLER_DB = DATABASE_DIR / "controller.db"
 STARTING_STORE_COUNT = 50
 
 def get_connection():
-    conn = sqlite3.connect(CONTROLLER_DB, timeout=10)
-    conn.row_factory = sqlite3.Row
-    return conn
+    conn = sqlite3.connect(
+        CONTROLLER_DB,
+        timeout=10
+    )
 
+    conn.row_factory = sqlite3.Row
+
+    # Controller database safety settings
+    conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA busy_timeout = 10000")
+    conn.execute("PRAGMA journal_mode = WAL")
+    conn.execute("PRAGMA synchronous = NORMAL")
+
+    return conn
 def now():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
