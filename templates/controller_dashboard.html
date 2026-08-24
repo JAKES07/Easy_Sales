@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>Easy Sales Controller</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f3f4f6;
+            color: #222;
+        }
+
+        .header {
+            background: #20252b;
+            color: white;
+            padding: 25px;
+        }
+
+        .header h1 {
+            margin: 0;
+        }
+
+        .header p {
+            color: #bbb;
+            margin-bottom: 0;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: auto;
+            padding: 20px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        .stat-number {
+            font-size: 32px;
+            font-weight: bold;
+            margin-top: 8px;
+        }
+
+        .card {
+            background: white;
+            padding: 22px;
+            border-radius: 12px;
+            margin-bottom: 25px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        input, textarea {
+            width: 100%;
+            padding: 14px;
+            margin-top: 8px;
+            margin-bottom: 15px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+
+        button {
+            border: none;
+            padding: 11px 16px;
+            border-radius: 7px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .btn-create {
+            background: #20252b;
+            color: white;
+            width: 100%;
+        }
+
+        .btn-activate {
+            background: #16803c;
+            color: white;
+        }
+
+        .btn-deactivate {
+            background: #b42318;
+            color: white;
+        }
+
+        .btn-reset {
+            background: #d98a00;
+            color: white;
+        }
+
+        .btn-view {
+            background: #2563eb;
+            color: white;
+            text-decoration: none;
+            padding: 11px 16px;
+            border-radius: 7px;
+            display: inline-block;
+        }
+
+        .store-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 18px;
+        }
+
+        .store-card {
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            padding: 18px;
+        }
+
+        .store-name {
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .store-id {
+            color: #666;
+            margin: 7px 0;
+            font-family: monospace;
+        }
+
+        .status {
+            display: inline-block;
+            padding: 6px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 12px;
+        }
+
+        .active {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .inactive {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .actions form {
+            margin: 0;
+        }
+
+        .flash {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 18px;
+        }
+
+        .flash-success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .flash-error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .empty {
+            color: #777;
+            text-align: center;
+            padding: 30px;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="header">
+    <h1>🏪 Easy Sales Controller</h1>
+    <p>Manage client stores, access and private store databases.</p>
+</div>
+
+<div class="container">
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="flash flash-{{ category }}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+
+    <!-- DASHBOARD STATISTICS -->
+
+    <div class="stats">
+
+        <div class="stat-card">
+            <div>Total Stores</div>
+            <div class="stat-number">{{ stats.total }}</div>
+        </div>
+
+        <div class="stat-card">
+            <div>Active Stores</div>
+            <div class="stat-number">{{ stats.active }}</div>
+        </div>
+
+        <div class="stat-card">
+            <div>Inactive Stores</div>
+            <div class="stat-number">{{ stats.inactive }}</div>
+        </div>
+
+    </div>
+
+
+    <!-- CREATE STORE -->
+
+    <div class="card">
+
+        <h2>Create New Client Store</h2>
+
+        <form action="{{ url_for('controller.create_new_store') }}"
+              method="POST">
+
+            <label><strong>Store Name</strong></label>
+
+            <input
+                type="text"
+                name="store_name"
+                placeholder="Example: Lincoln's Shop"
+                required
+            >
+
+            <label><strong>Notes (optional)</strong></label>
+
+            <textarea
+                name="notes"
+                placeholder="Client information or notes"
+            ></textarea>
+
+            <button type="submit" class="btn-create">
+                + Create Store
+            </button>
+
+        </form>
+
+    </div>
+
+
+    <!-- STORE LIST -->
+
+    <div class="card">
+
+        <h2>Client Stores</h2>
+
+        {% if stores %}
+
+        <div class="store-grid">
+
+            {% for store in stores %}
+
+            <div class="store-card">
+
+                <div class="store-name">
+                    {{ store["store_name"] }}
+                </div>
+
+                <div class="store-id">
+                    {{ store["store_id"] }}
+                </div>
+
+
+                {% if store["status"] == "ACTIVE" %}
+
+                    <div class="status active">
+                        ● ACTIVE
+                    </div>
+
+                {% else %}
+
+                    <div class="status inactive">
+                        ● INACTIVE
+                    </div>
+
+                {% endif %}
+
+
+                <div class="actions">
+
+                    <a
+                        class="btn-view"
+                        href="{{ url_for('controller.store_details',
+                        store_id=store['store_id']) }}"
+                    >
+                        View
+                    </a>
+
+
+                    {% if store["status"] == "ACTIVE" %}
+
+                    <form
+                        action="{{ url_for('controller.deactivate',
+                        store_id=store['store_id']) }}"
+                        method="POST"
+                    >
+
+                        <button
+                            type="submit"
+                            class="btn-deactivate"
+                        >
+                            Deactivate
+                        </button>
+
+                    </form>
+
+                    {% else %}
+
+                    <form
+                        action="{{ url_for('controller.activate',
+                        store_id=store['store_id']) }}"
+                        method="POST"
+                    >
+
+                        <button
+                            type="submit"
+                            class="btn-activate"
+                        >
+                            Activate
+                        </button>
+
+                    </form>
+
+                    {% endif %}
+
+
+                    <form
+                        action="{{ url_for('controller.reset_store_passkey',
+                        store_id=store['store_id']) }}"
+                        method="POST"
+                    >
+
+                        <button
+                            type="submit"
+                            class="btn-reset"
+                        >
+                            Reset Passkey
+                        </button>
+
+                    </form>
+
+                </div>
+
+            </div>
+
+            {% endfor %}
+
+        </div>
+
+        {% else %}
+
+            <div class="empty">
+                No client stores have been created yet.
+            </div>
+
+        {% endif %}
+
+    </div>
+
+</div>
+
+</body>
+</html>
