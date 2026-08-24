@@ -2807,3 +2807,26 @@ button:active {
     background: #b42318;
     color: white;
 }
+/* ============================================================
+   EDIT PRODUCT BUTTON
+   ============================================================ */
+
+.edit-button {
+
+    padding: 9px 12px;
+
+    border: none;
+
+    border-radius: 8px;
+
+    background-color: #eeeeee;
+
+    color: #222222;
+
+    font-size: 13px;
+
+    font-weight: bold;
+
+    cursor: pointer;
+
+}
