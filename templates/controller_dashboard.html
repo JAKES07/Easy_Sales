@@ -197,8 +197,18 @@
 <body>
 
 <div class="header">
-    <h1>🏪 Easy Sales Controller</h1>
-    <p>Manage client stores, access and private store databases.</p>
+    <div class="header-content">
+        <div>
+            <h1>🏪 Easy Sales Controller</h1>
+            <p>Manage client stores, access and private store databases.</p>
+        </div>
+
+        <form action="{{ url_for('controller.logout') }}" method="POST">
+            <button type="submit" class="btn-logout">
+                Logout
+            </button>
+        </form>
+    </div>
 </div>
 
 <div class="container">
