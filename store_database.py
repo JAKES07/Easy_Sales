@@ -45,13 +45,23 @@ def get_store_database_path(store_id):
 
 def get_store_connection(store_id):
     """Open a connection to one store's private database."""
+
     database_path = get_store_database_path(store_id)
     os.makedirs(STORES_DATABASE_DIR, exist_ok=True)
 
-    connection = sqlite3.connect(database_path, timeout=10)
+    connection = sqlite3.connect(
+        database_path,
+        timeout=10
+    )
+
+    connection.row_factory = sqlite3.Row
+
+    # Database safety settings
+    connection.execute("PRAGMA foreign_keys = ON")
     connection.execute("PRAGMA busy_timeout = 10000")
     connection.execute("PRAGMA journal_mode = WAL")
-    connection.row_factory = sqlite3.Row
+    connection.execute("PRAGMA synchronous = NORMAL")
+
     return connection
 
 
