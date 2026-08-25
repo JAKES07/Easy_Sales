@@ -402,22 +402,31 @@ def save_product():
                 "Invalid price."
 
         }), 400
-
     try:
-
         stock = int(
             data.get(
                 "stock",
                 0
             )
         )
-   # Barcode is optional.
-# Products without barcodes can still be saved.
-if barcode and not barcode.isdigit():
-    return jsonify({
-        "success": False,
-        "message": "Barcode must contain numbers only."
-    }), 400     
+
+    except (
+        ValueError,
+        TypeError
+    ):
+        return jsonify({
+            "success": False,
+            "message": "Invalid stock."
+        }), 400
+
+
+    # Barcode is optional.
+    # Products without barcodes can still be created.
+    if barcode and not barcode.isdigit():
+        return jsonify({
+            "success": False,
+            "message": "Barcode must contain numbers only."
+        }), 400     
 
     except (
         ValueError,
