@@ -80,7 +80,7 @@ def add_product(name, price, stock, barcode=None):
 def get_all_products():
     connection = get_connection()
     rows = connection.execute("""
-        SELECT id, name, price, stock
+        SELECT id, name, price, stock, barcode
         FROM products
         ORDER BY name
     """).fetchall()
