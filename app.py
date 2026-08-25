@@ -355,6 +355,13 @@ barcode = str(
                 0
             )
         )
+   # Barcode is optional.
+# Products without barcodes can still be saved.
+if barcode and not barcode.isdigit():
+    return jsonify({
+        "success": False,
+        "message": "Barcode must contain numbers only."
+    }), 400     
 
     except (
         ValueError,
@@ -410,9 +417,11 @@ barcode = str(
     try:
 
         product_id = add_product(
-            name,
-            price,
-            stock
+    name,
+    price,
+    stock,
+    barcode
+)
         )
 
         return jsonify({
