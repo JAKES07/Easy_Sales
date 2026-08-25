@@ -16,7 +16,6 @@ from flask import (
 )
 import sqlite3
 from werkzeug.middleware.proxy_fix import ProxyFix
-
 from database import (
     create_database,
     add_product,
@@ -32,8 +31,8 @@ from database import (
     get_stocktake_history,
     create_monthly_report,
     get_monthly_reports,
-    get_monthly_sales_summary
-    get_connection,
+    get_monthly_sales_summary,
+    get_connection
 )
 
 from store_controller import init_controller, get_store
