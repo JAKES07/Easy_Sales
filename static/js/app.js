@@ -4780,6 +4780,7 @@ const scannerStatus =
 let scannerStream = null;
 let barcodeDetector = null;
 let scannerRunning = false;
+let barcodeDetected = false;
 
 
 /* ============================================================
@@ -4788,13 +4789,23 @@ let scannerRunning = false;
 
 async function openScanner() {
 
-    if (!scannerWindow) {
+    if (
+        !scannerWindow ||
+        !scannerVideo ||
+        !scannerStatus
+    ) {
+        console.error(
+            "Scanner elements were not found."
+        );
         return;
     }
 
 
-    scannerWindow.classList.add("show");
+    // Reset scanner every time it opens
+    barcodeDetected = false;
+    scannerRunning = false;
 
+    scannerWindow.classList.add("show");
 
     scannerStatus.textContent =
         "Opening camera...";
@@ -4802,12 +4813,19 @@ async function openScanner() {
 
     try {
 
+        // Open the rear camera
         scannerStream =
             await navigator.mediaDevices.getUserMedia({
 
                 video: {
                     facingMode: {
                         ideal: "environment"
+                    },
+                    width: {
+                        ideal: 1920
+                    },
+                    height: {
+                        ideal: 1080
                     }
                 },
 
@@ -4820,52 +4838,88 @@ async function openScanner() {
             scannerStream;
 
 
+        // Wait until the video actually has camera data
+        await new Promise(
+            function(resolve) {
+
+                scannerVideo.onloadedmetadata =
+                    function() {
+                        resolve();
+                    };
+
+            }
+        );
+
+
         await scannerVideo.play();
 
 
         scannerStatus.textContent =
-            "Point the camera at a barcode";
+            "Camera ready — point at a barcode";
 
 
-        if ("BarcodeDetector" in window) {
-
-            barcodeDetector =
-                new BarcodeDetector({
-
-                    formats: [
-                        "ean_13",
-                        "ean_8",
-                        "code_128",
-                        "code_39",
-                        "upc_a",
-                        "upc_e"
-                    ]
-
-                });
-
-
-            scannerRunning = true;
-
-            scanBarcode();
-
-        } else {
+        // Check whether BarcodeDetector exists
+        if (!("BarcodeDetector" in window)) {
 
             scannerStatus.textContent =
-                "Barcode scanning is not supported on this browser.";
+                "Barcode detection is not supported by this browser.";
 
+            console.error(
+                "BarcodeDetector is not supported."
+            );
+
+            return;
         }
+
+
+        // Ask the browser which formats it supports
+        const supportedFormats =
+            await BarcodeDetector.getSupportedFormats();
+
+
+        const wantedFormats = [
+            "ean_13",
+            "ean_8",
+            "code_128",
+            "code_39",
+            "upc_a",
+            "upc_e"
+        ];
+
+
+        // Only use formats actually supported by the phone/browser
+        const formats =
+            wantedFormats.filter(
+                format =>
+                    supportedFormats.includes(format)
+            );
+
+
+        barcodeDetector =
+            new BarcodeDetector({
+                formats: formats
+            });
+
+
+        scannerRunning = true;
+
+
+        scannerStatus.textContent =
+            "Scanning... hold the barcode inside the camera.";
+
+        scanBarcode();
 
 
     } catch (error) {
 
         console.error(
-            "Scanner camera error:",
+            "Scanner error:",
             error
         );
 
-
         scannerStatus.textContent =
-            "Camera could not be opened.";
+            "Scanner error: " +
+            error.message;
 
     }
 
@@ -4878,7 +4932,25 @@ async function openScanner() {
 
 async function scanBarcode() {
 
-    if (!scannerRunning) {
+    // Stop if scanner was closed
+    if (
+        !scannerRunning ||
+        barcodeDetected
+    ) {
+        return;
+    }
+
+
+    // Wait until the video has a real camera frame
+    if (
+        scannerVideo.readyState <
+        HTMLMediaElement.HAVE_ENOUGH_DATA
+    ) {
+
+        requestAnimationFrame(
+            scanBarcode
+        );
+
         return;
     }
 
@@ -4897,24 +4969,52 @@ async function scanBarcode() {
                 barcodes[0].rawValue;
 
 
+            // Prevent the same barcode from firing repeatedly
+            barcodeDetected = true;
+            scannerRunning = false;
+
+
             scannerStatus.textContent =
-                "Barcode found: " + barcode;
+                "✓ Barcode detected: " +
+                barcode;
 
 
             console.log(
-                "Scanned barcode:",
+                "EASY SALES BARCODE:",
                 barcode
             );
 
 
-            /* ================================================
-               IMPORTANT
+            // STOP CAMERA AFTER A SUCCESSFUL SCAN
+            if (scannerStream) {
 
-               NEXT WE WILL CONNECT THIS BARCODE TO THE
-               EASY SALES PRODUCT DATABASE AND CART.
-               ================================================ */
+                scannerStream
+                    .getTracks()
+                    .forEach(
+                        track => track.stop()
+                    );
+
+                scannerStream = null;
+
+            }
+
+
+            /*
+            ------------------------------------------------
+            TEMPORARY TEST
+
+            We are testing barcode detection first.
+
+            Once this successfully detects your barcode,
+            we will connect this value to the owner's
+            product barcode and then the product/cart.
+            ------------------------------------------------
+            */
+
+            return;
 
         }
+
 
     } catch (error) {
 
@@ -4926,7 +5026,11 @@ async function scanBarcode() {
     }
 
 
-    if (scannerRunning) {
+    // Keep scanning
+    if (
+        scannerRunning &&
+        !barcodeDetected
+    ) {
 
         requestAnimationFrame(
             scanBarcode
@@ -4944,13 +5048,16 @@ async function scanBarcode() {
 function closeScanner() {
 
     scannerRunning = false;
+    barcodeDetected = false;
 
 
     if (scannerStream) {
 
         scannerStream
             .getTracks()
-            .forEach(track => track.stop());
+            .forEach(
+                track => track.stop()
+            );
 
         scannerStream = null;
 
@@ -4959,12 +5066,21 @@ function closeScanner() {
 
     if (scannerVideo) {
 
-        scannerVideo.srcObject = null;
+        scannerVideo.pause();
+
+        scannerVideo.srcObject =
+            null;
 
     }
 
 
-    scannerWindow.classList.remove("show");
+    if (scannerWindow) {
+
+        scannerWindow.classList.remove(
+            "show"
+        );
+
+    }
 
 }
 
