@@ -372,12 +372,13 @@ def save_product():
         )
     ).strip()
 
-barcode = str(
+    barcode = str(
     data.get(
         "barcode",
         ""
-    )
-).strip()
+        )
+    ).strip()
+    
     try:
 
         price = float(
