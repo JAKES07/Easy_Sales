@@ -426,25 +426,32 @@ if barcode and not barcode.isdigit():
 
         return jsonify({
 
-            "success":
-                True,
+    "success":
+        True,
 
-            "message":
-                "Product saved successfully.",
+    "message":
+        "Product saved successfully.",
 
-            "product": {
+    "product": {
 
-                "id":
-                    product_id,
+        "id":
+            product_id,
 
-                "name":
-                    name,
+        "name":
+            name,
 
-                "price":
-                    price,
+        "price":
+            price,
 
-                "stock":
-                    stock
+        "stock":
+            stock,
+
+        "barcode":
+            barcode or None
+
+    }
+
+})
 
             }
 
