@@ -719,7 +719,55 @@
 
 </div>
 
+<!-- ========================================================
+     POS BARCODE SCANNER WINDOW
+     ======================================================== -->
 
+<div id="scanner-window" class="scanner-window">
+
+    <div class="scanner-header">
+
+        <div>
+            <h2>Scan Product</h2>
+            <span>Point the camera at a product barcode</span>
+        </div>
+
+        <button
+            id="close-scanner"
+            type="button">
+
+            ×
+
+        </button>
+
+    </div>
+
+
+    <div class="scanner-content">
+
+        <div class="scanner-camera-box">
+
+            <video
+                id="scanner-video"
+                autoplay
+                playsinline>
+
+            </video>
+
+            <div class="scanner-line"></div>
+
+        </div>
+
+
+        <p id="scanner-status" class="scanner-status">
+
+            Opening camera...
+
+        </p>
+
+    </div>
+
+</div>
 
 <!-- ========================================================
      JAVASCRIPT
