@@ -478,7 +478,7 @@ if barcode and not barcode.isdigit():
     stock,
     barcode
 )
-        )
+        
 
         return jsonify({
 
