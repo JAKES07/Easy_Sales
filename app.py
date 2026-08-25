@@ -317,6 +317,12 @@ def save_product():
         )
     ).strip()
 
+barcode = str(
+    data.get(
+        "barcode",
+        ""
+    )
+).strip()
     try:
 
         price = float(
