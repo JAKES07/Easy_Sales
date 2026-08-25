@@ -4757,3 +4757,237 @@ setTimeout(
     checkLiveStoreAccess,
     1500
 );
+/* ============================================================
+   POS BARCODE SCANNER
+   ============================================================ */
+
+const scannerButton =
+    document.getElementById("scanner-button");
+
+const scannerWindow =
+    document.getElementById("scanner-window");
+
+const closeScannerButton =
+    document.getElementById("close-scanner");
+
+const scannerVideo =
+    document.getElementById("scanner-video");
+
+const scannerStatus =
+    document.getElementById("scanner-status");
+
+
+let scannerStream = null;
+let barcodeDetector = null;
+let scannerRunning = false;
+
+
+/* ============================================================
+   OPEN SCANNER
+   ============================================================ */
+
+async function openScanner() {
+
+    if (!scannerWindow) {
+        return;
+    }
+
+
+    scannerWindow.classList.add("show");
+
+
+    scannerStatus.textContent =
+        "Opening camera...";
+
+
+    try {
+
+        scannerStream =
+            await navigator.mediaDevices.getUserMedia({
+
+                video: {
+                    facingMode: {
+                        ideal: "environment"
+                    }
+                },
+
+                audio: false
+
+            });
+
+
+        scannerVideo.srcObject =
+            scannerStream;
+
+
+        await scannerVideo.play();
+
+
+        scannerStatus.textContent =
+            "Point the camera at a barcode";
+
+
+        if ("BarcodeDetector" in window) {
+
+            barcodeDetector =
+                new BarcodeDetector({
+
+                    formats: [
+                        "ean_13",
+                        "ean_8",
+                        "code_128",
+                        "code_39",
+                        "upc_a",
+                        "upc_e"
+                    ]
+
+                });
+
+
+            scannerRunning = true;
+
+            scanBarcode();
+
+        } else {
+
+            scannerStatus.textContent =
+                "Barcode scanning is not supported on this browser.";
+
+        }
+
+
+    } catch (error) {
+
+        console.error(
+            "Scanner camera error:",
+            error
+        );
+
+
+        scannerStatus.textContent =
+            "Camera could not be opened.";
+
+    }
+
+}
+
+
+/* ============================================================
+   SCAN BARCODE
+   ============================================================ */
+
+async function scanBarcode() {
+
+    if (!scannerRunning) {
+        return;
+    }
+
+
+    try {
+
+        const barcodes =
+            await barcodeDetector.detect(
+                scannerVideo
+            );
+
+
+        if (barcodes.length > 0) {
+
+            const barcode =
+                barcodes[0].rawValue;
+
+
+            scannerStatus.textContent =
+                "Barcode found: " + barcode;
+
+
+            console.log(
+                "Scanned barcode:",
+                barcode
+            );
+
+
+            /* ================================================
+               IMPORTANT
+
+               NEXT WE WILL CONNECT THIS BARCODE TO THE
+               EASY SALES PRODUCT DATABASE AND CART.
+               ================================================ */
+
+        }
+
+    } catch (error) {
+
+        console.error(
+            "Barcode detection error:",
+            error
+        );
+
+    }
+
+
+    if (scannerRunning) {
+
+        requestAnimationFrame(
+            scanBarcode
+        );
+
+    }
+
+}
+
+
+/* ============================================================
+   CLOSE SCANNER
+   ============================================================ */
+
+function closeScanner() {
+
+    scannerRunning = false;
+
+
+    if (scannerStream) {
+
+        scannerStream
+            .getTracks()
+            .forEach(track => track.stop());
+
+        scannerStream = null;
+
+    }
+
+
+    if (scannerVideo) {
+
+        scannerVideo.srcObject = null;
+
+    }
+
+
+    scannerWindow.classList.remove("show");
+
+}
+
+
+/* ============================================================
+   SCANNER BUTTON EVENTS
+   ============================================================ */
+
+if (scannerButton) {
+
+    scannerButton.addEventListener(
+        "click",
+        openScanner
+    );
+
+}
+
+
+if (closeScannerButton) {
+
+    closeScannerButton.addEventListener(
+        "click",
+        closeScanner
+    );
+
+}
