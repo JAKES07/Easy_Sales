@@ -4999,19 +4999,77 @@ async function scanBarcode() {
             }
 
 
-            /*
-            ------------------------------------------------
-            TEMPORARY TEST
+            scannerStatus.textContent =
+    "Looking for product...";
 
-            We are testing barcode detection first.
+try {
 
-            Once this successfully detects your barcode,
-            we will connect this value to the owner's
-            product barcode and then the product/cart.
-            ------------------------------------------------
-            */
+    const response =
+        await fetch(
+            "/api/products/barcode/" +
+            encodeURIComponent(barcode)
+        );
 
-            return;
+    const data =
+        await response.json();
+
+    if (
+        response.ok &&
+        data.success &&
+        data.product
+    ) {
+
+        addToCart(
+            data.product
+        );
+
+        scannerStatus.textContent =
+            "✓ Added to cart: " +
+            data.product.name;
+
+        // Give the cashier a moment to see the result,
+        // then close the scanner.
+        setTimeout(
+            function() {
+                closeScanner();
+            },
+            700
+        );
+
+    } else {
+
+        scannerStatus.textContent =
+            "⚠ Barcode not registered in Easy Sales.";
+
+        // Keep the scanner open so another barcode
+        // can be scanned.
+        barcodeDetected = false;
+        scannerRunning = true;
+
+        requestAnimationFrame(
+            scanBarcode
+        );
+    }
+
+} catch (error) {
+
+    console.error(
+        "BARCODE PRODUCT LOOKUP ERROR:",
+        error
+    );
+
+    scannerStatus.textContent =
+        "Could not find the product.";
+
+    barcodeDetected = false;
+    scannerRunning = true;
+
+    requestAnimationFrame(
+        scanBarcode
+    );
+}
+
+return;
 
         }
 
