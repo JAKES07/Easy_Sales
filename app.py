@@ -481,37 +481,16 @@ if barcode and not barcode.isdigit():
         
 
         return jsonify({
-
-    "success":
-        True,
-
-    "message":
-        "Product saved successfully.",
-
+    "success": True,
+    "message": "Product saved successfully.",
     "product": {
-
-        "id":
-            product_id,
-
-        "name":
-            name,
-
-        "price":
-            price,
-
-        "stock":
-            stock,
-
-        "barcode":
-            barcode or None
-
+        "id": product_id,
+        "name": name,
+        "price": price,
+        "stock": stock,
+        "barcode": barcode or None
     }
-
 })
-
-            }
-
-        })
 
     except sqlite3.IntegrityError as error:
 
