@@ -428,20 +428,7 @@ def save_product():
             "message": "Barcode must contain numbers only."
         }), 400     
 
-    except (
-        ValueError,
-        TypeError
-    ):
-
-        return jsonify({
-
-            "success":
-                False,
-
-            "message":
-                "Invalid stock quantity."
-
-        }), 400
+    
 
     if not name:
 
