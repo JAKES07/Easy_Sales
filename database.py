@@ -79,13 +79,43 @@ def add_product(name, price, stock, barcode=None):
 
 def get_all_products():
     connection = get_connection()
+
     rows = connection.execute("""
         SELECT id, name, price, stock, barcode
         FROM products
         ORDER BY name
     """).fetchall()
+
     connection.close()
+
     return [dict(row) for row in rows]
+
+
+# ============================================================
+# FIND PRODUCT BY BARCODE
+# ============================================================
+
+def get_product_by_barcode(barcode):
+
+    connection = get_connection()
+
+    try:
+
+        product = connection.execute("""
+            SELECT id, name, price, stock, barcode
+            FROM products
+            WHERE barcode = ?
+        """, (str(barcode).strip(),)).fetchone()
+
+        if not product:
+            return None
+
+        return dict(product)
+
+    finally:
+
+        connection.close()
+
 
 
 
