@@ -16,11 +16,13 @@ from flask import (
 )
 import sqlite3
 from werkzeug.middleware.proxy_fix import ProxyFix
+
 from database import (
     create_database,
     add_product,
     update_product,
     get_all_products,
+    get_product_by_barcode,
     complete_sale,
     get_stock_take,
     get_today_sales,
@@ -282,15 +284,15 @@ def get_products():
                 "Could not load products."
 
         }), 500
-        # ============================================================
+# ============================================================
 # FIND PRODUCT BY BARCODE
 # ============================================================
 
 @app.route(
-    "/api/products/barcode/<barcode>",
+    "/api/products/barcode/<path:barcode>",
     methods=["GET"]
 )
-def get_product_by_barcode(barcode):
+def find_product_by_barcode(barcode):
 
     barcode = str(barcode).strip()
 
@@ -300,26 +302,29 @@ def get_product_by_barcode(barcode):
             "message": "Barcode is required."
         }), 400
 
-    connection = None
-
     try:
-        connection = get_connection()
 
-        product = connection.execute("""
-            SELECT id, name, price, stock, barcode
-            FROM products
-            WHERE barcode = ?
-        """, (barcode,)).fetchone()
+        print("EASY SALES BARCODE LOOKUP:", repr(barcode))
+
+        product = get_product_by_barcode(barcode)
 
         if not product:
+
+            print("BARCODE NOT FOUND:", repr(barcode))
+
             return jsonify({
                 "success": False,
                 "message": "No product is registered with this barcode."
             }), 404
 
+        print(
+            "BARCODE PRODUCT FOUND:",
+            product["name"]
+        )
+
         return jsonify({
             "success": True,
-            "product": dict(product)
+            "product": product
         })
 
     except Exception as error:
@@ -333,11 +338,6 @@ def get_product_by_barcode(barcode):
             "success": False,
             "message": "Could not look up barcode."
         }), 500
-
-    finally:
-        if connection:
-            connection.close()
-
 
 # ============================================================
 # ADD NEW PRODUCT
