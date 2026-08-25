@@ -282,6 +282,61 @@ def get_products():
                 "Could not load products."
 
         }), 500
+        # ============================================================
+# FIND PRODUCT BY BARCODE
+# ============================================================
+
+@app.route(
+    "/api/products/barcode/<barcode>",
+    methods=["GET"]
+)
+def get_product_by_barcode(barcode):
+
+    barcode = str(barcode).strip()
+
+    if not barcode:
+        return jsonify({
+            "success": False,
+            "message": "Barcode is required."
+        }), 400
+
+    connection = None
+
+    try:
+        connection = get_connection()
+
+        product = connection.execute("""
+            SELECT id, name, price, stock, barcode
+            FROM products
+            WHERE barcode = ?
+        """, (barcode,)).fetchone()
+
+        if not product:
+            return jsonify({
+                "success": False,
+                "message": "No product is registered with this barcode."
+            }), 404
+
+        return jsonify({
+            "success": True,
+            "product": dict(product)
+        })
+
+    except Exception as error:
+
+        print(
+            "BARCODE LOOKUP ERROR:",
+            error
+        )
+
+        return jsonify({
+            "success": False,
+            "message": "Could not look up barcode."
+        }), 500
+
+    finally:
+        if connection:
+            connection.close()
 
 
 # ============================================================
