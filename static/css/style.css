@@ -2830,3 +2830,169 @@ button:active {
     cursor: pointer;
 
 }
+/* ============================================================
+   POS BARCODE SCANNER
+   ============================================================ */
+
+.scanner-window {
+
+    position: fixed;
+
+    top: 0;
+    left: 0;
+
+    width: 100%;
+    height: 100%;
+
+    background-color: #eeeeee;
+
+    z-index: 6000;
+
+    display: none;
+
+    flex-direction: column;
+
+}
+
+
+.scanner-window.show {
+
+    display: flex;
+
+}
+
+
+.scanner-header {
+
+    background-color: #222222;
+
+    color: white;
+
+    min-height: 75px;
+
+    padding: 15px 20px;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+}
+
+
+.scanner-header h2 {
+
+    margin: 0;
+
+    font-size: 24px;
+
+}
+
+
+.scanner-header span {
+
+    display: block;
+
+    margin-top: 4px;
+
+    color: #cccccc;
+
+    font-size: 13px;
+
+}
+
+
+#close-scanner {
+
+    width: 42px;
+
+    height: 42px;
+
+    border: none;
+
+    border-radius: 50%;
+
+    background-color: white;
+
+    color: #222222;
+
+    font-size: 28px;
+
+    cursor: pointer;
+
+}
+
+
+.scanner-content {
+
+    flex: 1;
+
+    display: flex;
+
+    flex-direction: column;
+
+    justify-content: center;
+
+    padding: 20px;
+
+}
+
+
+.scanner-camera-box {
+
+    position: relative;
+
+    width: 100%;
+
+    overflow: hidden;
+
+    border-radius: 16px;
+
+    background-color: #111111;
+
+}
+
+
+#scanner-video {
+
+    width: 100%;
+
+    display: block;
+
+    max-height: 65vh;
+
+    object-fit: cover;
+
+}
+
+
+.scanner-line {
+
+    position: absolute;
+
+    left: 10%;
+    width: 80%;
+
+    top: 50%;
+
+    height: 2px;
+
+    background-color: #ffffff;
+
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+
+}
+
+
+.scanner-status {
+
+    text-align: center;
+
+    margin-top: 20px;
+
+    color: #555555;
+
+    font-size: 15px;
+
+}
