@@ -49,16 +49,21 @@ def _ensure_column(cursor, table_name, column_name, definition):
 
 
 
-def add_product(name, price, stock):
-    """Add a product and ALWAYS release the SQLite connection."""
+def add_product(name, price, stock, barcode=None):
+    """Add a product with an optional barcode."""
     connection = get_connection()
     cursor = connection.cursor()
 
     try:
         cursor.execute("""
-            INSERT INTO products (name, price, stock)
-            VALUES (?, ?, ?)
-        """, (name, price, stock))
+            INSERT INTO products (name, price, stock, barcode)
+            VALUES (?, ?, ?, ?)
+        """, (
+            name,
+            price,
+            stock,
+            barcode.strip() if barcode else None
+        ))
 
         product_id = cursor.lastrowid
         connection.commit()
