@@ -4932,7 +4932,6 @@ async function openScanner() {
 
 async function scanBarcode() {
 
-    // Stop if scanner was closed
     if (
         !scannerRunning ||
         barcodeDetected
@@ -4941,7 +4940,6 @@ async function scanBarcode() {
     }
 
 
-    // Wait until the video has a real camera frame
     if (
         scannerVideo.readyState <
         HTMLMediaElement.HAVE_ENOUGH_DATA
@@ -4966,110 +4964,166 @@ async function scanBarcode() {
         if (barcodes.length > 0) {
 
             const barcode =
-                barcodes[0].rawValue;
+                String(
+                    barcodes[0].rawValue
+                ).trim();
 
 
-            // Prevent the same barcode from firing repeatedly
+            // Prevent multiple detections while checking
             barcodeDetected = true;
-            scannerRunning = false;
 
 
             scannerStatus.textContent =
-                "✓ Barcode detected: " +
-                barcode;
+                "Looking for product...";
 
 
             console.log(
-                "EASY SALES BARCODE:",
-                barcode
+                "EASY SALES BARCODE DETECTED:",
+                JSON.stringify(barcode)
             );
 
 
-            // STOP CAMERA AFTER A SUCCESSFUL SCAN
-            if (scannerStream) {
+            try {
 
-                scannerStream
-                    .getTracks()
-                    .forEach(
-                        track => track.stop()
+                const response =
+                    await fetch(
+                        "/api/products/barcode/" +
+                        encodeURIComponent(barcode),
+                        {
+                            cache: "no-store"
+                        }
                     );
 
-                scannerStream = null;
+
+                const data =
+                    await response.json();
+
+
+                // ====================================================
+                // PRODUCT FOUND
+                // ====================================================
+
+                if (
+                    response.ok &&
+                    data.success &&
+                    data.product
+                ) {
+
+                    scannerRunning = false;
+
+
+                    console.log(
+                        "EASY SALES PRODUCT FOUND:",
+                        data.product
+                    );
+
+
+                    addToCart(
+                        data.product
+                    );
+
+
+                    scannerStatus.textContent =
+                        "✓ Added to cart: " +
+                        data.product.name;
+
+
+                    // Stop camera only after successful scan
+                    if (scannerStream) {
+
+                        scannerStream
+                            .getTracks()
+                            .forEach(
+                                track => track.stop()
+                            );
+
+                        scannerStream = null;
+
+                    }
+
+
+                    setTimeout(
+                        function() {
+                            closeScanner();
+                        },
+                        700
+                    );
+
+                    return;
+
+                }
+
+
+                // ====================================================
+                // PRODUCT NOT FOUND
+                // ====================================================
+
+                scannerStatus.textContent =
+                    "⚠ Barcode not registered. Try again.";
+
+
+                console.log(
+                    "BARCODE NOT REGISTERED:",
+                    barcode,
+                    data
+                );
+
+
+                // Allow another scan WITHOUT stopping camera
+                barcodeDetected = false;
+
+
+                setTimeout(
+                    function() {
+
+                        if (scannerRunning) {
+
+                            requestAnimationFrame(
+                                scanBarcode
+                            );
+
+                        }
+
+                    },
+                    1000
+                );
+
+                return;
+
+
+            } catch (error) {
+
+                console.error(
+                    "BARCODE PRODUCT LOOKUP ERROR:",
+                    error
+                );
+
+
+                scannerStatus.textContent =
+                    "Could not look up product. Trying again...";
+
+
+                barcodeDetected = false;
+
+
+                setTimeout(
+                    function() {
+
+                        if (scannerRunning) {
+
+                            requestAnimationFrame(
+                                scanBarcode
+                            );
+
+                        }
+
+                    },
+                    1000
+                );
+
+                return;
 
             }
-
-
-            scannerStatus.textContent =
-    "Looking for product...";
-
-try {
-
-    const response =
-        await fetch(
-            "/api/products/barcode/" +
-            encodeURIComponent(barcode)
-        );
-
-    const data =
-        await response.json();
-
-    if (
-        response.ok &&
-        data.success &&
-        data.product
-    ) {
-
-        addToCart(
-            data.product
-        );
-
-        scannerStatus.textContent =
-            "✓ Added to cart: " +
-            data.product.name;
-
-        // Give the cashier a moment to see the result,
-        // then close the scanner.
-        setTimeout(
-            function() {
-                closeScanner();
-            },
-            700
-        );
-
-    } else {
-
-        scannerStatus.textContent =
-            "⚠ Barcode not registered in Easy Sales.";
-
-        // Keep the scanner open so another barcode
-        // can be scanned.
-        barcodeDetected = false;
-        scannerRunning = true;
-
-        requestAnimationFrame(
-            scanBarcode
-        );
-    }
-
-} catch (error) {
-
-    console.error(
-        "BARCODE PRODUCT LOOKUP ERROR:",
-        error
-    );
-
-    scannerStatus.textContent =
-        "Could not find the product.";
-
-    barcodeDetected = false;
-    scannerRunning = true;
-
-    requestAnimationFrame(
-        scanBarcode
-    );
-}
-
-return;
 
         }
 
@@ -5084,7 +5138,6 @@ return;
     }
 
 
-    // Keep scanning
     if (
         scannerRunning &&
         !barcodeDetected
@@ -5097,7 +5150,6 @@ return;
     }
 
 }
-
 
 /* ============================================================
    CLOSE SCANNER
