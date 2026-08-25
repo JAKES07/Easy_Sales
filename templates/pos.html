@@ -39,17 +39,28 @@
     <header class="top-section">
 
 
-        <!-- LOGO -->
+        <!-- LOGO + POS SCANNER -->
 
-        <div class="logo-area">
+<div class="logo-area">
 
-            <img
-                src="{{ url_for('static', filename='images/logo.png') }}"
-                alt="Easy Sales Logo"
-                class="main-logo"
-            >
+    <img
+        src="{{ url_for('static', filename='images/logo.png') }}"
+        alt="Easy Sales Logo"
+        class="main-logo"
+    >
 
-        </div>
+    <button
+        id="open-pos-scanner"
+        class="scan-icon-button"
+        type="button"
+        aria-label="Scan product barcode"
+        title="Scan product">
+
+        📷
+
+    </button>
+
+</div>
 
 
         <!-- MAIN BUTTONS -->
