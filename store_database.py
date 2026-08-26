@@ -2,20 +2,17 @@
 # EASY SALES - PRIVATE STORE DATABASE MANAGER
 # ============================================================
 #
-# Place this file in:
-# Easy_Sales/store_database.py
+# Each client store has its own private database.
 #
-# PURPOSE
-# -------
-# Each client store receives its own SQLite database:
+# DEVELOPMENT:
+#   Easy_Sales/database/stores/STORE001.db
 #
-# database/stores/STORE001.db
-# database/stores/STORE002.db
-# ...
+# PRODUCTION:
+#   Location set by EASY_SALES_DATA_DIR.
 #
-# A store database is NEVER deleted when a store is deactivated.
-# Deactivation only removes access. This keeps the client's data
-# available if they return and reactivate their store later.
+# IMPORTANT:
+# Customer data is stored separately from the application code so
+# deployments can update Easy Sales without replacing live data.
 # ============================================================
 
 import os
@@ -24,7 +21,26 @@ import sqlite3
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-STORES_DATABASE_DIR = os.path.join(BASE_DIR, "database", "stores")
+
+# ------------------------------------------------------------
+# LIVE DATA DIRECTORY
+# ------------------------------------------------------------
+# On your local Pydroid3 setup, this uses:
+# Easy_Sales/database
+#
+# On Render, we will set EASY_SALES_DATA_DIR to the persistent
+# disk location.
+# ------------------------------------------------------------
+
+LIVE_DATA_DIR = os.environ.get(
+    "EASY_SALES_DATA_DIR",
+    os.path.join(BASE_DIR, "database")
+)
+
+STORES_DATABASE_DIR = os.path.join(
+    LIVE_DATA_DIR,
+    "stores"
+)
 
 
 def _clean_store_id(store_id):
@@ -40,14 +56,22 @@ def _clean_store_id(store_id):
 def get_store_database_path(store_id):
     """Return the private database path for one store."""
     store_id = _clean_store_id(store_id)
-    return os.path.join(STORES_DATABASE_DIR, f"{store_id}.db")
+
+    return os.path.join(
+        STORES_DATABASE_DIR,
+        f"{store_id}.db"
+    )
 
 
 def get_store_connection(store_id):
     """Open a connection to one store's private database."""
 
     database_path = get_store_database_path(store_id)
-    os.makedirs(STORES_DATABASE_DIR, exist_ok=True)
+
+    os.makedirs(
+        STORES_DATABASE_DIR,
+        exist_ok=True
+    )
 
     connection = sqlite3.connect(
         database_path,
@@ -65,13 +89,32 @@ def get_store_connection(store_id):
     return connection
 
 
+def _ensure_column(cursor, table_name, column_name, definition):
+    """Add a column safely when upgrading an older store database."""
+
+    columns = {
+        row[1]
+        for row in cursor.execute(
+            f"PRAGMA table_info({table_name})"
+        ).fetchall()
+    }
+
+    if column_name not in columns:
+        cursor.execute(
+            f"ALTER TABLE {table_name} "
+            f"ADD COLUMN {column_name} {definition}"
+        )
+
+
 def create_store_database(store_id):
     """
     Create the private Easy Sales database for a store if it does not
     already exist.
 
-    Safe to run more than once. Existing client data is preserved.
+    Safe to run repeatedly. Existing products, sales and stock are
+    never deleted by this function.
     """
+
     connection = get_store_connection(store_id)
     cursor = connection.cursor()
 
@@ -168,25 +211,63 @@ def create_store_database(store_id):
         )
     """)
 
-    # Safe migrations for databases created by earlier versions.
+    # --------------------------------------------------------
+    # SAFE DATABASE UPGRADES
+    # --------------------------------------------------------
+
     _ensure_column(cursor, "products", "barcode", "TEXT")
     _ensure_column(cursor, "sales", "transaction_id", "TEXT")
-    _ensure_column(cursor, "sales", "sale_fee", "REAL NOT NULL DEFAULT 0")
-    _ensure_column(cursor, "monthly_reports", "cash_sales_count",
-                   "INTEGER NOT NULL DEFAULT 0")
-    _ensure_column(cursor, "monthly_reports", "cash_sales_amount",
-                   "REAL NOT NULL DEFAULT 0")
-    _ensure_column(cursor, "monthly_reports", "card_sales_count",
-                   "INTEGER NOT NULL DEFAULT 0")
-    _ensure_column(cursor, "monthly_reports", "card_sales_amount",
-                   "REAL NOT NULL DEFAULT 0")
-    _ensure_column(cursor, "monthly_reports", "total_sales_count",
-                   "INTEGER NOT NULL DEFAULT 0")
-    _ensure_column(cursor, "monthly_reports", "total_sales_amount",
-                   "REAL NOT NULL DEFAULT 0")
-    _ensure_column(cursor, "monthly_reports", "total_sales_units",
-                   "INTEGER NOT NULL DEFAULT 0")
+    _ensure_column(
+        cursor,
+        "sales",
+        "sale_fee",
+        "REAL NOT NULL DEFAULT 0"
+    )
 
+    _ensure_column(
+        cursor,
+        "monthly_reports",
+        "cash_sales_count",
+        "INTEGER NOT NULL DEFAULT 0"
+    )
+    _ensure_column(
+        cursor,
+        "monthly_reports",
+        "cash_sales_amount",
+        "REAL NOT NULL DEFAULT 0"
+    )
+    _ensure_column(
+        cursor,
+        "monthly_reports",
+        "card_sales_count",
+        "INTEGER NOT NULL DEFAULT 0"
+    )
+    _ensure_column(
+        cursor,
+        "monthly_reports",
+        "card_sales_amount",
+        "REAL NOT NULL DEFAULT 0"
+    )
+    _ensure_column(
+        cursor,
+        "monthly_reports",
+        "total_sales_count",
+        "INTEGER NOT NULL DEFAULT 0"
+    )
+    _ensure_column(
+        cursor,
+        "monthly_reports",
+        "total_sales_amount",
+        "REAL NOT NULL DEFAULT 0"
+    )
+    _ensure_column(
+        cursor,
+        "monthly_reports",
+        "total_sales_units",
+        "INTEGER NOT NULL DEFAULT 0"
+    )
+
+    # Give older sales a transaction ID if they do not have one.
     cursor.execute("""
         UPDATE sales
         SET transaction_id = 'LEGACY-' || id
@@ -199,24 +280,14 @@ def create_store_database(store_id):
     return get_store_database_path(store_id)
 
 
-def _ensure_column(cursor, table_name, column_name, definition):
-    columns = {
-        row[1]
-        for row in cursor.execute(
-            f"PRAGMA table_info({table_name})"
-        ).fetchall()
-    }
-
-    if column_name not in columns:
-        cursor.execute(
-            f"ALTER TABLE {table_name} "
-            f"ADD COLUMN {column_name} {definition}"
-        )
-
-
 def store_database_exists(store_id):
     """Check whether a private database already exists for a store."""
-    return os.path.exists(get_store_database_path(store_id))
+
+    return os.path.exists(
+        get_store_database_path(store_id)
+    )
+
+
 # ============================================================
 # RESET ONE STORE'S POS DATA
 # ============================================================
@@ -225,15 +296,12 @@ def reset_store_data(store_id):
     """
     Reset ONLY the POS data belonging to one store.
 
-    The store itself is NOT deleted from the controller system.
-    Its Store ID, name, passkey and activation status remain intact.
-
-    Other stores are completely untouched.
+    The store's controller account and activation status are NOT
+    changed. Other stores are completely untouched.
     """
 
     store_id = _clean_store_id(store_id)
 
-    # Make sure the store has its private database.
     create_store_database(store_id)
 
     connection = get_store_connection(store_id)
@@ -241,14 +309,14 @@ def reset_store_data(store_id):
 
     try:
 
-        # Child/history tables first.
+        # History tables first.
         cursor.execute("DELETE FROM monthly_report_items")
         cursor.execute("DELETE FROM monthly_reports")
         cursor.execute("DELETE FROM stock_takes")
         cursor.execute("DELETE FROM stock_movements")
         cursor.execute("DELETE FROM sales")
 
-        # Finally remove all products and remaining stock.
+        # Products are removed last.
         cursor.execute("DELETE FROM products")
 
         connection.commit()
@@ -268,9 +336,14 @@ def reset_store_data(store_id):
 
         connection.close()
 
+
 if __name__ == "__main__":
-    os.makedirs(STORES_DATABASE_DIR, exist_ok=True)
+
+    os.makedirs(
+        STORES_DATABASE_DIR,
+        exist_ok=True
+    )
 
     print("Easy Sales Private Store Database Manager is ready.")
+    print(f"Live data folder: {LIVE_DATA_DIR}")
     print(f"Store databases folder: {STORES_DATABASE_DIR}")
-    print("Client databases will be created only when a store is assigned.")
