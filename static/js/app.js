@@ -880,26 +880,28 @@ async function saveProduct() {
         document.getElementById(
             "product-stock"
         );
-    
+
     const barcodeInput =
-    document.getElementById(
-        "product-barcode"
-    );
+        document.getElementById(
+            "product-barcode"
+        );
 
     const saveButton =
         document.getElementById(
             "save-product"
         );
 
+
     if (
-    !nameInput ||
-    !priceInput ||
-    !stockInput ||
-    !barcodeInput ||
-    !saveButton
-) {
-    return;
-}
+        !nameInput ||
+        !priceInput ||
+        !stockInput ||
+        !barcodeInput ||
+        !saveButton
+    ) {
+        return;
+    }
+
 
     const name =
         nameInput.value.trim();
@@ -913,6 +915,13 @@ async function saveProduct() {
             10
         );
 
+    const barcode =
+        barcodeInput.value.trim();
+
+
+    // ========================================================
+    // VALIDATION
+    // ========================================================
 
     if (!name) {
 
@@ -950,6 +959,24 @@ async function saveProduct() {
     }
 
 
+    // Barcode is optional, but if entered it must contain numbers.
+    if (
+        barcode &&
+        !/^\d+$/.test(barcode)
+    ) {
+
+        showAddProductMessage(
+            "Barcode must contain numbers only."
+        );
+
+        return;
+    }
+
+
+    // ========================================================
+    // SAVE PRODUCT
+    // ========================================================
+
     saveButton.disabled = true;
 
     saveButton.textContent =
@@ -978,7 +1005,9 @@ async function saveProduct() {
 
                         price: price,
 
-                        stock: stock
+                        stock: stock,
+
+                        barcode: barcode
 
                     })
 
@@ -1011,11 +1040,14 @@ async function saveProduct() {
         );
 
 
+        // Clear all product fields, including barcode.
         nameInput.value = "";
 
         priceInput.value = "";
 
         stockInput.value = "";
+
+        barcodeInput.value = "";
 
 
         await loadProducts();
