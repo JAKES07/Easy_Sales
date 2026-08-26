@@ -185,22 +185,19 @@ def login():
             ""
         )
 
-        if verify_controller_password(
-            password
-        ):
+        if verify_controller_password(password):
 
-            # Clear any old identity before granting controller access.
-            session.clear()
+    session.clear()
 
-            session[
-                "controller_authenticated"
-            ] = True
+    session["controller_authenticated"] = True
 
-            session.permanent = True
+    # Controller login lasts for the current browser session.
+    # Logging out always removes controller access.
+    session.permanent = False
 
-            return redirect(
-                url_for("controller.dashboard")
-            )
+    return redirect(
+        url_for("controller.dashboard")
+    )
 
         flash(
             "Invalid controller password.",
