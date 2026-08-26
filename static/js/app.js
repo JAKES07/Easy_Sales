@@ -880,6 +880,11 @@ async function saveProduct() {
         document.getElementById(
             "product-stock"
         );
+    
+    const barcodeInput =
+    document.getElementById(
+        "product-barcode"
+    );
 
     const saveButton =
         document.getElementById(
@@ -887,13 +892,14 @@ async function saveProduct() {
         );
 
     if (
-        !nameInput ||
-        !priceInput ||
-        !stockInput ||
-        !saveButton
-    ) {
-        return;
-    }
+    !nameInput ||
+    !priceInput ||
+    !stockInput ||
+    !barcodeInput ||
+    !saveButton
+) {
+    return;
+}
 
     const name =
         nameInput.value.trim();
