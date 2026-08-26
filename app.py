@@ -3012,16 +3012,9 @@ def logout():
 # ============================================================
 
 if __name__ == "__main__":
-
     app.run(
-
         host="0.0.0.0",
-
         port=5000,
-
-        # Keep a single Flask process on Pydroid/Android.
-        # The debug reloader can create a second process and lock SQLite.
         debug=False,
         use_reloader=False
-
     )
