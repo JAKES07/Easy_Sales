@@ -380,6 +380,23 @@
                         </button>
 
                     </form>
+                    <form
+    action="{{ url_for('controller.reset_store_data',
+    store_id=store['store_id']) }}"
+    method="POST"
+    onsubmit="return confirm(
+        'WARNING: This will permanently delete all products, sales, stock history and reports for {{ store["store_name"] }}. The store itself will remain. Are you sure you want to reset this store?'
+    );"
+>
+
+    <button
+        type="submit"
+        class="btn-reset"
+    >
+        🔄 Reset Store Data
+    </button>
+
+</form>
 
                 </div>
 
