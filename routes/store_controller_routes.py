@@ -185,7 +185,7 @@ def login():
             ""
         )
 
-        if verify_controller_password(password):
+    if verify_controller_password(password):
 
     session.clear()
 
