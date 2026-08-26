@@ -217,7 +217,56 @@ def _ensure_column(cursor, table_name, column_name, definition):
 def store_database_exists(store_id):
     """Check whether a private database already exists for a store."""
     return os.path.exists(get_store_database_path(store_id))
+# ============================================================
+# RESET ONE STORE'S POS DATA
+# ============================================================
 
+def reset_store_data(store_id):
+    """
+    Reset ONLY the POS data belonging to one store.
+
+    The store itself is NOT deleted from the controller system.
+    Its Store ID, name, passkey and activation status remain intact.
+
+    Other stores are completely untouched.
+    """
+
+    store_id = _clean_store_id(store_id)
+
+    # Make sure the store has its private database.
+    create_store_database(store_id)
+
+    connection = get_store_connection(store_id)
+    cursor = connection.cursor()
+
+    try:
+
+        # Child/history tables first.
+        cursor.execute("DELETE FROM monthly_report_items")
+        cursor.execute("DELETE FROM monthly_reports")
+        cursor.execute("DELETE FROM stock_takes")
+        cursor.execute("DELETE FROM stock_movements")
+        cursor.execute("DELETE FROM sales")
+
+        # Finally remove all products and remaining stock.
+        cursor.execute("DELETE FROM products")
+
+        connection.commit()
+
+        return {
+            "success": True,
+            "store_id": store_id,
+            "message": "Store data reset successfully."
+        }
+
+    except Exception:
+
+        connection.rollback()
+        raise
+
+    finally:
+
+        connection.close()
 
 if __name__ == "__main__":
     os.makedirs(STORES_DATABASE_DIR, exist_ok=True)
