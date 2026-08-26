@@ -1558,6 +1558,7 @@ if __name__ == "__main__":
         debug=False,
         use_reloader=False
 )
+    EASY_SALES_ENV = os.environ.get(
     "EASY_SALES_ENV",
     "development"
 ).lower()
