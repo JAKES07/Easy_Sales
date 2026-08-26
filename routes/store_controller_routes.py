@@ -30,6 +30,8 @@ from controller_auth import (
     controller_login_required,
 )
 
+from store_database import reset_store_data
+
 
 controller_bp = Blueprint(
     "controller",
@@ -290,3 +292,49 @@ def store_details(store_id):
         "store_details.html",
         store=store
     )
+    # ============================================================
+# RESET STORE DATA
+# ============================================================
+
+@controller_bp.route(
+    "/api/stores/<store_id>/reset",
+    methods=["POST"]
+)
+def reset_store(store_id):
+    """
+    Reset the POS data for ONE store only.
+
+    The store remains registered in the controller system.
+    """
+
+    try:
+
+        result = reset_store_data(store_id)
+
+        return jsonify({
+            "success": True,
+            "message": (
+                f"All POS data for {store_id} "
+                "has been reset successfully."
+            ),
+            "store_id": result["store_id"]
+        })
+
+    except ValueError as error:
+
+        return jsonify({
+            "success": False,
+            "message": str(error)
+        }), 400
+
+    except Exception as error:
+
+        print(
+            "RESET STORE DATA ERROR:",
+            error
+        )
+
+        return jsonify({
+            "success": False,
+            "message": "Could not reset the store data."
+        }), 500
