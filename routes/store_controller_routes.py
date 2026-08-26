@@ -186,8 +186,7 @@ def login():
         )
 
     if verify_controller_password(password):
-
-    session.clear()
+        session.clear()
 
     session["controller_authenticated"] = True
 
