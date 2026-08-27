@@ -1732,14 +1732,7 @@ def enforce_store_access():
 # HOME / POS SCREEN
 # ============================================================
 
-@app.route("/")
-def home():
 
-    return render_template(
-        "pos.html",
-        store_id=session.get("store_id"),
-        store_name=session.get("store_name")
-    )
 
 
 # ============================================================
