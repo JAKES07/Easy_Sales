@@ -328,34 +328,6 @@ def home():
 # GET ALL PRODUCTS
 # ============================================================
 
-@app.route(
-    "/api/products",
-    methods=["GET"]
-)
-def get_products():
-
-    try:
-
-        products = get_all_products()
-
-        return jsonify({
-            "success": True,
-            "products": products
-        })
-
-    except Exception as error:
-
-        print(
-            "GET PRODUCTS ERROR:",
-            error
-        )
-
-        return jsonify({
-            "success": False,
-            "message": (
-                "Could not load products."
-            )
-        }), 500
 
 
 # ============================================================
