@@ -36,13 +36,21 @@ _configured_data_dir = os.environ.get(
 
 if _configured_data_dir:
 
+    # Explicit configuration always wins.
     LIVE_DATA_DIR = os.path.abspath(
         os.path.expanduser(_configured_data_dir)
     )
 
+elif os.path.isdir("/var/data"):
+
+    # Render persistent disk. The Easy Sales Render service mounts its
+    # persistent disk here, so production data survives redeployments
+    # even when an environment variable was not configured manually.
+    LIVE_DATA_DIR = "/var/data"
+
 else:
-    # Local Pydroid development location.
-    # Production must explicitly set EASY_SALES_DATA_DIR.
+
+    # Local Pydroid / development location.
     LIVE_DATA_DIR = os.path.join(
         BASE_DIR,
         "database"
