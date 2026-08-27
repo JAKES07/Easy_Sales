@@ -344,6 +344,73 @@ def home():
 
 
 # ============================================================
+# GET / ADD PRODUCTS
+# ============================================================
+
+@app.route("/api/products", methods=["GET", "POST"])
+def products():
+
+    if request.method == "GET":
+        try:
+            return jsonify({
+                "success": True,
+                "products": get_all_products()
+            })
+        except Exception as error:
+            print("GET PRODUCTS ERROR:", error)
+            return jsonify({
+                "success": False,
+                "message": "Could not load products."
+            }), 500
+
+    data = request.get_json(silent=True) or {}
+
+    name = str(data.get("name", "")).strip()
+    barcode = str(data.get("barcode", "")).strip() or None
+
+    try:
+        price = float(data.get("price"))
+        stock = int(data.get("stock"))
+    except (TypeError, ValueError):
+        return jsonify({
+            "success": False,
+            "message": "Enter a valid price and stock quantity."
+        }), 400
+
+    if not name:
+        return jsonify({
+            "success": False,
+            "message": "Product name is required."
+        }), 400
+
+    if price < 0 or stock < 0:
+        return jsonify({
+            "success": False,
+            "message": "Price and stock cannot be negative."
+        }), 400
+
+    try:
+        product_id = add_product(name, price, stock, barcode)
+        return jsonify({
+            "success": True,
+            "message": "Product saved successfully.",
+            "product_id": product_id
+        }), 201
+    except sqlite3.IntegrityError as error:
+        print("ADD PRODUCT INTEGRITY ERROR:", error)
+        return jsonify({
+            "success": False,
+            "message": "A product with that barcode already exists."
+        }), 400
+    except Exception as error:
+        print("ADD PRODUCT ERROR:", error)
+        return jsonify({
+            "success": False,
+            "message": "Could not save product."
+        }), 500
+
+
+# ============================================================
 # FIND PRODUCT BY BARCODE
 # ============================================================
 
