@@ -1,73 +1,59 @@
-EASY SALES - RENDER PERSISTENT DATA DEPLOYMENT
-================================================
+EASY SALES - RENDER PERSISTENT DATABASE DEPLOYMENT
+=================================================
 
-THIS PACKAGE FIXES THE DATABASE RESET PROBLEM
+THIS PROJECT FIXES THE DATABASE RESET PROBLEM
 ---------------------------------------------
-The controller database and every private store database use ONE live
-data directory. In production the app refuses to start unless that
-directory is supplied through EASY_SALES_DATA_DIR. This prevents a
-Render deployment from silently creating a new database inside the app
-folder.
+Easy Sales now uses Render's persistent disk automatically when the disk
+is mounted at /var/data. Both the controller and every customer store
+use the same persistent location:
 
-RENDER SETUP
-------------
-1. In your Render Web Service, add a Persistent Disk.
-2. Choose a mount path, for example:
-
-   /var/data
-
-3. Add these Environment Variables:
-
-   EASY_SALES_ENV=production
-   EASY_SALES_DATA_DIR=/var/data
-   EASY_SALES_SECRET_KEY=<your long random secret>
-
-4. Save the settings and redeploy.
-
-WHAT IS STORED ON THE PERSISTENT DISK
--------------------------------------
 /var/data/controller.db
 /var/data/stores/STORE001.db
 /var/data/stores/STORE002.db
-...and every other private store database.
+...
 
-GitHub deployments replace application code, but they do NOT replace
-the mounted persistent disk. Therefore store activation status, passkeys,
-products, sales and stock remain after future updates.
+IMPORTANT: DO NOT PUT DATABASE FILES IN THE GITHUB PROJECT
+---------------------------------------------------------
+The application code comes from GitHub, but live customer data is created
+on the Render disk at runtime. A GitHub update therefore replaces the code
+without replacing controller status, passkeys, products, stock or sales.
 
-IMPORTANT FIRST DEPLOYMENT NOTE
--------------------------------
-A persistent disk is a new storage location. If your current live Render
-data exists only in the old temporary application filesystem, attach the
-disk BEFORE relying on it and make a backup/copy of the existing live
-databases if you need to preserve those exact records. Once the live data
-is on the persistent disk, future deployments keep using it.
-
-SAFETY CHECK
+RENDER SETUP
 ------------
-In production Easy Sales will now fail loudly if EASY_SALES_DATA_DIR is
-missing instead of starting with a temporary database. That is intentional:
-it protects your customer data from accidental resets.
+1. Keep the Persistent Disk mounted at:
 
-START COMMAND
--------------
-gunicorn --workers 1 --threads 4 --timeout 120 app:app
+   /var/data
 
-WHY ONE WORKER?
----------------
-Easy Sales currently uses SQLite. One worker is the safest starting
-configuration and reduces SQLite write contention.
+2. Upload this complete project to GitHub.
 
-LOCAL PYDROID
-------------
-Do not set EASY_SALES_ENV=production. Without EASY_SALES_DATA_DIR the
-app continues to use its local database folder for development.
+3. Root Directory on Render: leave it BLANK when the files are at the
+   repository root.
+
+4. Build Command:
+
+   pip install -r requirements.txt
+
+5. Start Command:
+
+   gunicorn --workers 1 --threads 4 --timeout 120 app:app
+
+6. Recommended environment variable:
+
+   EASY_SALES_SECRET_KEY = a long private random value
+
+OPTIONAL
+--------
+You can also set EASY_SALES_DATA_DIR=/var/data explicitly. The application
+will already choose /var/data automatically when that persistent disk is
+mounted.
 
 FINAL TEST
 ----------
 1. Activate STORE001.
 2. Add a clearly named test product.
-3. Redeploy the same service.
-4. Confirm STORE001 is still ACTIVE and the product is still there.
+3. Deploy an update.
+4. Confirm STORE001 is still ACTIVE.
+5. Confirm the same passkey still works.
+6. Confirm the product is still there.
 
-If both are still there, the persistent live database is working.
+If all three remain, the persistent live database is working correctly.
