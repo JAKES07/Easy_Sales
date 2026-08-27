@@ -2971,19 +2971,23 @@ def todays_sales():
 
         }), 500
 
-
 # ============================================================
 # LIVE STORE SESSION STATUS
 # ============================================================
 
-@app.route("/api/session-status", methods=["GET"])
+@app.route(
+    "/api/session-status",
+    methods=["GET"]
+)
 def session_status():
     """
     Used by the POS to periodically confirm that the current store is
-    still ACTIVE. The before_request security guard runs before this
-    route, so an inactive store is blocked immediately.
+    still ACTIVE.
     """
-    store = get_store(session.get("store_id"))
+
+    store = get_store(
+        session.get("store_id")
+    )
 
     return jsonify({
         "success": True,
@@ -2997,15 +3001,32 @@ def session_status():
 # STORE / POS LOGOUT
 # ============================================================
 
-@app.route("/logout", methods=["POST", "GET"])
+@app.route(
+    "/logout",
+    methods=["POST", "GET"]
+)
 def logout():
-    # Only remove the customer store identity. Controller authentication,
-    # when used in another session context, is not granted to the POS.
-    session.pop("store_id", None)
-    session.pop("store_name", None)
-    session.pop("store_authenticated_at", None)
 
-    return redirect(url_for("store_access.store_access_page"))
+    session.pop(
+        "store_id",
+        None
+    )
+
+    session.pop(
+        "store_name",
+        None
+    )
+
+    session.pop(
+        "store_authenticated_at",
+        None
+    )
+
+    return redirect(
+        url_for(
+            "store_access.store_access_page"
+        )
+    )
 
 
 # ============================================================
@@ -3013,6 +3034,7 @@ def logout():
 # ============================================================
 
 if __name__ == "__main__":
+
     app.run(
         host="0.0.0.0",
         port=5000,
