@@ -1,0 +1,3034 @@
+/* ============================================================
+   EASY SALES POS
+   MAIN STYLESHEET
+   ============================================================ */
+
+
+/* ============================================================
+   1. BASIC PAGE SETTINGS
+   ============================================================ */
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+
+body {
+
+    font-family: Arial, sans-serif;
+
+    background-color: #eeeeee;
+
+    color: #222222;
+
+    overflow: hidden;
+
+}
+
+
+/* ============================================================
+   2. MAIN POS CONTAINER
+   ============================================================ */
+
+.pos-container {
+
+    height: 100vh;
+
+    width: 100%;
+
+    display: flex;
+
+    flex-direction: column;
+
+    overflow: hidden;
+
+}
+
+
+/* ============================================================
+   3. TOP SECTION
+   ============================================================ */
+
+.top-section {
+
+    background-color: #ffffff;
+
+    padding: 10px 15px 15px 15px;
+
+    flex-shrink: 0;
+
+}
+
+
+/* ============================================================
+   4. LOGO
+   ============================================================ */
+
+.logo-area {
+
+    width: 100%;
+
+    display: flex;
+
+    justify-content: center;
+
+    align-items: center;
+
+    padding: 5px 0 12px 0;
+
+}
+
+
+.main-logo {
+
+    width: 150px;
+
+    height: auto;
+
+    object-fit: contain;
+
+}
+
+
+/* ============================================================
+   5. MAIN BUTTONS
+   ============================================================ */
+
+.scanner-buttons {
+
+    display: flex;
+
+    gap: 10px;
+
+    margin-bottom: 12px;
+
+}
+
+
+.scanner-buttons button {
+
+    flex: 1;
+
+    padding: 12px;
+
+    border: none;
+
+    border-radius: 8px;
+
+    background-color: #333333;
+
+    color: #ffffff;
+
+    font-size: 14px;
+
+    cursor: pointer;
+
+}
+
+
+.scanner-buttons button:active {
+
+    transform: scale(0.98);
+
+}
+
+
+/* ============================================================
+   6. SEARCH
+   ============================================================ */
+
+.search-area {
+
+    width: 100%;
+
+}
+
+
+.search-area input {
+
+    width: 100%;
+
+    padding: 13px;
+
+    border: 1px solid #cccccc;
+
+    border-radius: 8px;
+
+    font-size: 16px;
+
+    outline: none;
+
+}
+
+
+.search-area input:focus {
+
+    border-color: #333333;
+
+}
+
+
+/* ============================================================
+   7. PRODUCT AREA
+   ============================================================ */
+
+.product-area {
+
+    flex: 1;
+
+    overflow-y: auto;
+
+    padding: 8px;
+
+    padding-bottom: 90px;
+
+}
+
+
+/* ============================================================
+   8. PRODUCT ROW
+   ============================================================ */
+
+.product-row {
+
+    background-color: #ffffff;
+
+    margin-bottom: 6px;
+
+    padding: 12px;
+
+    border-radius: 8px;
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 10px;
+
+}
+
+
+/* ============================================================
+   9. PRODUCT INFORMATION
+   ============================================================ */
+
+.product-information {
+
+    flex: 1;
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 4px;
+
+}
+
+
+.product-information strong {
+
+    font-size: 16px;
+
+}
+
+
+.product-information span {
+
+    font-size: 12px;
+
+    color: #777777;
+
+}
+
+
+/* ============================================================
+   10. PRODUCT PRICE
+   ============================================================ */
+
+.product-price {
+
+    font-weight: bold;
+
+    font-size: 15px;
+
+}
+
+
+/* ============================================================
+   11. ADD BUTTON
+   ============================================================ */
+
+.add-button {
+
+    width: 38px;
+
+    height: 38px;
+
+    border: none;
+
+    border-radius: 50%;
+
+    background-color: #222222;
+
+    color: #ffffff;
+
+    font-size: 22px;
+
+    cursor: pointer;
+
+}
+
+
+.add-button:active {
+
+    transform: scale(0.92);
+
+}
+
+
+/* ============================================================
+   12. CART BOTTOM SECTION
+   ============================================================ */
+
+.bottom-section {
+
+    position: fixed;
+
+    bottom: 0;
+
+    left: 0;
+
+    width: 100%;
+
+    display: flex;
+
+    justify-content: center;
+
+    padding: 10px;
+
+    z-index: 1000;
+
+}
+
+
+/* ============================================================
+   CART BUTTON - LOGO ONLY
+   ============================================================ */
+
+#cart-button {
+
+    width: 100px;
+    height: 70px;
+
+    min-width: unset;
+
+    border: none;
+
+    border-radius: 12px;
+
+    background-color: #ffffff;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    padding: 5px;
+
+    cursor: pointer;
+
+    box-shadow:
+        0 4px 12px rgba(0, 0, 0, 0.18);
+
+}
+
+
+/* Make the Easy Sales logo fill the button */
+
+.cart-logo {
+
+    width: 100%;
+
+    height: 100%;
+
+    object-fit: contain;
+
+}
+
+
+/* Hide the Cart text and counter visually */
+
+#cart-button span:not(#cart-count) {
+
+    display: none;
+
+}
+
+
+#cart-count {
+
+    display: none;
+
+}
+
+/* ============================================================
+   16. CART WINDOW
+   ============================================================ */
+
+.cart-window {
+
+    position: fixed;
+
+    top: 0;
+
+    left: 0;
+
+    width: 100%;
+
+    height: 100%;
+
+    background-color: #ffffff;
+
+    z-index: 2000;
+
+    display: none;
+
+    flex-direction: column;
+
+}
+
+
+.cart-window.show {
+
+    display: flex;
+
+}
+
+
+/* ============================================================
+   17. CART HEADER
+   ============================================================ */
+
+.cart-header {
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    padding: 15px;
+
+    background-color: #222222;
+
+    color: white;
+
+}
+
+
+.cart-header h2 {
+
+    font-size: 22px;
+
+}
+
+
+#close-cart {
+
+    width: 40px;
+
+    height: 40px;
+
+    border: none;
+
+    border-radius: 50%;
+
+    background-color: #ffffff;
+
+    color: #222222;
+
+    font-size: 28px;
+
+    line-height: 1;
+
+}
+
+
+/* ============================================================
+   18. CART PRODUCTS
+   ============================================================ */
+
+.cart-items {
+
+    flex: 1;
+
+    overflow-y: auto;
+
+    padding: 10px;
+
+    background-color: #eeeeee;
+
+}
+
+
+.cart-item {
+
+    background-color: #ffffff;
+
+    border-radius: 8px;
+
+    padding: 12px;
+
+    margin-bottom: 8px;
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 10px;
+
+}
+
+
+.cart-item-info {
+
+    flex: 1;
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 4px;
+
+}
+
+
+.cart-item-info strong {
+
+    font-size: 15px;
+
+}
+
+
+.cart-item-info span {
+
+    font-size: 12px;
+
+    color: #777777;
+
+}
+
+
+/* ============================================================
+   19. QUANTITY CONTROLS
+   ============================================================ */
+
+.quantity-controls {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 8px;
+
+}
+
+
+.quantity-controls button {
+
+    width: 32px;
+
+    height: 32px;
+
+    border: none;
+
+    border-radius: 50%;
+
+    background-color: #222222;
+
+    color: white;
+
+    font-size: 18px;
+
+}
+
+
+.quantity-controls span {
+
+    min-width: 20px;
+
+    text-align: center;
+
+    font-weight: bold;
+
+}
+
+
+/* ============================================================
+   20. CART ITEM TOTAL
+   ============================================================ */
+
+.cart-item-total {
+
+    min-width: 65px;
+
+    text-align: right;
+
+    font-size: 14px;
+
+}
+
+
+/* ============================================================
+   21. EMPTY CART
+   ============================================================ */
+
+.empty-cart {
+
+    text-align: center;
+
+    color: #777777;
+
+    padding: 40px 10px;
+
+    font-size: 16px;
+
+}
+
+
+/* ============================================================
+   22. CART SUMMARY
+   ============================================================ */
+
+.cart-summary {
+
+    padding: 15px;
+
+    background-color: white;
+
+    border-top: 1px solid #dddddd;
+
+}
+
+
+.total-row {
+
+    display: flex;
+
+    justify-content: space-between;
+
+    align-items: center;
+
+}
+
+
+.total-row strong:last-child {
+
+    font-size: 22px;
+
+}
+
+
+/* ============================================================
+   23. CART ACTIONS
+   ============================================================ */
+
+.cart-actions {
+
+    display: flex;
+
+    gap: 10px;
+
+    padding: 10px;
+
+    background-color: white;
+
+}
+
+
+.cart-actions button {
+
+    flex: 1;
+
+    padding: 14px;
+
+    border: none;
+
+    border-radius: 8px;
+
+    font-size: 15px;
+
+    font-weight: bold;
+
+}
+
+
+.clear-cart-button {
+
+    background-color: #eeeeee;
+
+    color: #222222;
+
+}
+
+
+.checkout-button {
+
+    background-color: #222222;
+
+    color: white;
+
+}
+
+
+/* ============================================================
+   24. CHECKOUT WINDOW
+   ============================================================ */
+
+.checkout-window {
+
+    position: fixed;
+
+    top: 0;
+
+    left: 0;
+
+    width: 100%;
+
+    height: 100%;
+
+    background-color: #eeeeee;
+
+    z-index: 3000;
+
+    display: none;
+
+    flex-direction: column;
+
+}
+
+
+.checkout-window.show {
+
+    display: flex;
+
+}
+
+
+/* ============================================================
+   25. CHECKOUT HEADER
+   ============================================================ */
+
+.checkout-header {
+
+    background-color: #222222;
+
+    color: white;
+
+    padding: 15px;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+}
+
+
+.checkout-header h2 {
+
+    font-size: 24px;
+
+}
+
+
+#close-checkout {
+
+    width: 42px;
+
+    height: 42px;
+
+    border: none;
+
+    border-radius: 50%;
+
+    background-color: white;
+
+    color: #222222;
+
+    font-size: 28px;
+
+}
+
+
+/* ============================================================
+   26. CHECKOUT CONTENT
+   ============================================================ */
+
+.checkout-content {
+
+    flex: 1;
+
+    overflow-y: auto;
+
+    padding: 15px;
+
+}
+
+
+/* ============================================================
+   27. CHECKOUT TOTAL
+   ============================================================ */
+
+.checkout-total {
+
+    background-color: white;
+
+    border-radius: 10px;
+
+    padding: 18px;
+
+    margin-bottom: 20px;
+
+    display: flex;
+
+    justify-content: space-between;
+
+    align-items: center;
+
+}
+
+
+.checkout-total span {
+
+    font-size: 18px;
+
+    font-weight: bold;
+
+}
+
+
+.checkout-total strong {
+
+    font-size: 28px;
+
+}
+
+
+/* ============================================================
+   28. PAYMENT METHOD
+   ============================================================ */
+
+.checkout-content h3 {
+
+    margin-bottom: 10px;
+
+    font-size: 18px;
+
+}
+
+
+.payment-methods {
+
+    display: flex;
+
+    gap: 10px;
+
+    margin-bottom: 20px;
+
+}
+
+
+.payment-button {
+
+    flex: 1;
+
+    padding: 16px;
+
+    border: 2px solid #dddddd;
+
+    border-radius: 10px;
+
+    background-color: white;
+
+    color: #222222;
+
+    font-size: 17px;
+
+    font-weight: bold;
+
+}
+
+
+.payment-button.selected {
+
+    background-color: #222222;
+
+    color: white;
+
+    border-color: #222222;
+
+}
+
+
+/* ============================================================
+   29. CASH SECTION
+   ============================================================ */
+
+.cash-section {
+
+    background-color: white;
+
+    padding: 15px;
+
+    border-radius: 10px;
+
+}
+
+
+.cash-section label {
+
+    display: block;
+
+    margin-bottom: 8px;
+
+    font-weight: bold;
+
+}
+
+
+#cash-received {
+
+    width: 100%;
+
+    padding: 15px;
+
+    border: 1px solid #cccccc;
+
+    border-radius: 8px;
+
+    font-size: 20px;
+
+    outline: none;
+
+}
+
+
+#cash-received:focus {
+
+    border-color: #222222;
+
+}
+
+
+/* ============================================================
+   30. CHANGE BOX
+   ============================================================ */
+
+.change-box {
+
+    margin-top: 15px;
+
+    padding: 15px;
+
+    border-radius: 8px;
+
+    background-color: #eeeeee;
+
+    display: flex;
+
+    justify-content: space-between;
+
+    align-items: center;
+
+}
+
+
+.change-box span {
+
+    font-size: 17px;
+
+    font-weight: bold;
+
+}
+
+
+.change-box strong {
+
+    font-size: 24px;
+
+}
+
+
+/* ============================================================
+   31. CARD SECTION
+   ============================================================ */
+
+.card-section {
+
+    display: none;
+
+    background-color: white;
+
+    border-radius: 10px;
+
+    padding: 30px;
+
+    text-align: center;
+
+}
+
+
+.card-section.show {
+
+    display: block;
+
+}
+
+
+.card-message {
+
+    font-size: 40px;
+
+}
+
+
+.card-message p {
+
+    margin-top: 10px;
+
+    font-size: 17px;
+
+    color: #666666;
+
+}
+
+
+/* ============================================================
+   32. CHECKOUT ACTIONS
+   ============================================================ */
+
+.checkout-actions {
+
+    background-color: white;
+
+    padding: 10px;
+
+}
+
+
+.complete-sale-button {
+
+    width: 100%;
+
+    padding: 16px;
+
+    border: none;
+
+    border-radius: 10px;
+
+    background-color: #222222;
+
+    color: white;
+
+    font-size: 18px;
+
+    font-weight: bold;
+
+}
+
+
+.complete-sale-button:active {
+
+    transform: scale(0.98);
+
+}
+
+
+/* ============================================================
+   33. ADD PRODUCT WINDOW
+   ============================================================ */
+
+.owner-window {
+
+    position: fixed;
+
+    top: 0;
+
+    left: 0;
+
+    width: 100%;
+
+    height: 100%;
+
+    background-color: #eeeeee;
+
+    z-index: 5000;
+
+    display: none;
+
+    flex-direction: column;
+
+}
+
+
+.owner-window.show {
+
+    display: flex;
+
+}
+
+
+/* ============================================================
+   34. ADD PRODUCT HEADER
+   ============================================================ */
+
+.owner-header {
+
+    background-color: #222222;
+
+    color: white;
+
+    min-height: 75px;
+
+    padding: 15px 20px;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+}
+
+
+.owner-header h2 {
+
+    margin: 0;
+
+    font-size: 24px;
+
+}
+
+
+.owner-header span {
+
+    color: #cccccc;
+
+    font-size: 13px;
+
+}
+
+
+.owner-header button {
+
+    width: 42px;
+
+    height: 42px;
+
+    border: none;
+
+    border-radius: 50%;
+
+    background-color: white;
+
+    color: #222222;
+
+    font-size: 28px;
+
+}
+
+
+/* ============================================================
+   35. ADD PRODUCT FORM
+   ============================================================ */
+
+.add-product-content {
+
+    width: 90%;
+
+    max-width: 600px;
+
+    margin: 20px auto;
+
+    padding-bottom: 30px;
+
+    overflow-y: auto;
+
+}
+
+
+.add-product-content label {
+
+    display: block;
+
+    margin-top: 16px;
+
+    margin-bottom: 7px;
+
+    font-size: 16px;
+
+    font-weight: bold;
+
+    color: #222222;
+
+}
+
+
+.add-product-content input {
+
+    width: 100%;
+
+    padding: 16px;
+
+    border: 1px solid #cccccc;
+
+    border-radius: 10px;
+
+    background-color: white;
+
+    color: #222222;
+
+    font-size: 17px;
+
+    outline: none;
+
+}
+
+
+.add-product-content input:focus {
+
+    border: 2px solid #222222;
+
+}
+
+
+.barcode-status {
+
+    width: 100%;
+
+    margin-top: 10px;
+
+    padding: 13px;
+
+    border-radius: 10px;
+
+    background-color: #e8e8e8;
+
+    color: #555555;
+
+    text-align: center;
+
+    font-size: 14px;
+
+}
+
+
+.save-product-button {
+
+    width: 100%;
+
+    margin-top: 25px;
+
+    padding: 17px;
+
+    border: none;
+
+    border-radius: 10px;
+
+    background-color: #222222;
+
+    color: white;
+
+    font-size: 18px;
+
+    font-weight: bold;
+
+}
+
+
+/* ============================================================
+   36. STOCK TAKE WINDOW
+   ============================================================ */
+
+.stock-window {
+
+    position: fixed;
+
+    top: 0;
+
+    left: 0;
+
+    width: 100%;
+
+    height: 100%;
+
+    background-color: #eeeeee;
+
+    z-index: 4500;
+
+    display: none;
+
+    flex-direction: column;
+
+}
+
+
+.stock-window.show {
+
+    display: flex;
+
+}
+
+
+/* ============================================================
+   37. STOCK TAKE HEADER
+   ============================================================ */
+
+.stock-header {
+
+    background-color: #222222;
+
+    color: white;
+
+    min-height: 75px;
+
+    padding: 15px 20px;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    flex-shrink: 0;
+
+}
+
+
+.stock-header h2 {
+
+    font-size: 24px;
+
+}
+
+
+.stock-header span {
+
+    display: block;
+
+    margin-top: 4px;
+
+    color: #cccccc;
+
+    font-size: 13px;
+
+}
+
+
+#close-stock-take {
+
+    width: 42px;
+
+    height: 42px;
+
+    border: none;
+
+    border-radius: 50%;
+
+    background-color: white;
+
+    color: #222222;
+
+    font-size: 28px;
+
+}
+
+
+/* ============================================================
+   38. STOCK TAKE LIST
+   ============================================================ */
+
+.stock-take-list {
+
+    flex: 1;
+
+    overflow-y: auto;
+
+    padding: 10px;
+
+}
+
+
+/* ============================================================
+   39. STOCK PRODUCT CARD
+   ============================================================ */
+
+.stock-product-row {
+
+    background-color: white;
+
+    border-radius: 12px;
+
+    margin-bottom: 12px;
+
+    padding: 16px;
+
+    box-shadow:
+        0 2px 7px rgba(0, 0, 0, 0.08);
+
+}
+
+
+/* ============================================================
+   40. PRODUCT HEADER
+   ============================================================ */
+
+.stock-product-info {
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 5px;
+
+    padding-bottom: 12px;
+
+    border-bottom: 1px solid #eeeeee;
+
+}
+
+
+.stock-product-info strong {
+
+    font-size: 18px;
+
+}
+
+
+.stock-product-info span {
+
+    color: #777777;
+
+    font-size: 13px;
+
+}
+
+
+/* ============================================================
+   41. STOCK SUMMARY
+   ============================================================ */
+
+.stock-summary {
+
+    display: grid;
+
+    grid-template-columns: repeat(3, 1fr);
+
+    gap: 8px;
+
+    margin-top: 12px;
+
+}
+
+
+.stock-summary-box {
+
+    background-color: #eeeeee;
+
+    border-radius: 8px;
+
+    padding: 10px;
+
+    text-align: center;
+
+}
+
+
+.stock-summary-box span {
+
+    display: block;
+
+    color: #777777;
+
+    font-size: 11px;
+
+    margin-bottom: 5px;
+
+}
+
+
+.stock-summary-box strong {
+
+    font-size: 19px;
+
+}
+
+
+/* ============================================================
+   42. PHYSICAL COUNT
+   ============================================================ */
+
+.stock-count-section {
+
+    margin-top: 15px;
+
+}
+
+
+.stock-count-section label {
+
+    display: block;
+
+    margin-bottom: 7px;
+
+    font-weight: bold;
+
+    font-size: 14px;
+
+}
+
+
+.stock-count-input {
+
+    width: 100%;
+
+    padding: 14px;
+
+    border: 2px solid #cccccc;
+
+    border-radius: 9px;
+
+    background-color: white;
+
+    font-size: 20px;
+
+    font-weight: bold;
+
+    text-align: center;
+
+    outline: none;
+
+}
+
+
+.stock-count-input:focus {
+
+    border-color: #222222;
+
+}
+
+
+/* ============================================================
+   43. VARIANCE
+   ============================================================ */
+
+.stock-variance {
+
+    margin-top: 10px;
+
+    padding: 12px;
+
+    border-radius: 8px;
+
+    background-color: #eeeeee;
+
+    display: flex;
+
+    justify-content: space-between;
+
+    align-items: center;
+
+}
+
+
+.stock-variance span {
+
+    font-weight: bold;
+
+}
+
+
+.stock-variance strong {
+
+    font-size: 20px;
+
+}
+
+
+.stock-variance.positive {
+
+    background-color: #e6f4ea;
+
+}
+
+
+.stock-variance.negative {
+
+    background-color: #fce8e6;
+
+}
+
+
+/* ============================================================
+   44. STOCK MOVEMENT BUTTONS
+   ============================================================ */
+
+.stock-movement-buttons {
+
+    display: grid;
+
+    grid-template-columns: 1fr 1fr;
+
+    gap: 10px;
+
+    margin-top: 15px;
+
+}
+
+
+.stock-add-button,
+.stock-remove-button {
+
+    padding: 13px;
+
+    border: none;
+
+    border-radius: 8px;
+
+    color: white;
+
+    font-size: 14px;
+
+    font-weight: bold;
+
+}
+
+
+.stock-add-button {
+
+    background-color: #222222;
+
+}
+
+
+.stock-remove-button {
+
+    background-color: #555555;
+
+}
+
+
+.stock-add-button:active,
+.stock-remove-button:active {
+
+    transform: scale(0.98);
+
+}
+
+
+/* ============================================================
+   45. STOCK REASON
+   ============================================================ */
+
+.stock-reason {
+
+    width: 100%;
+
+    margin-top: 10px;
+
+    padding: 13px;
+
+    border: 1px solid #cccccc;
+
+    border-radius: 8px;
+
+    font-size: 14px;
+
+    outline: none;
+
+}
+
+
+.stock-reason:focus {
+
+    border-color: #222222;
+
+}
+
+
+/* ============================================================
+   46. SAVE STOCKTAKE
+   ============================================================ */
+
+.stock-save-button {
+
+    width: 100%;
+
+    margin-top: 10px;
+
+    padding: 14px;
+
+    border: none;
+
+    border-radius: 9px;
+
+    background-color: #222222;
+
+    color: white;
+
+    font-size: 15px;
+
+    font-weight: bold;
+
+}
+
+
+.stock-save-button:disabled {
+
+    opacity: 0.6;
+
+}
+
+
+/* ============================================================
+   47. STOCK HISTORY BUTTONS
+   ============================================================ */
+
+.stock-history-buttons {
+
+    display: grid;
+
+    grid-template-columns: 1fr 1fr;
+
+    gap: 8px;
+
+    margin-top: 10px;
+
+}
+
+
+.stock-history-button {
+
+    padding: 11px;
+
+    border: 1px solid #cccccc;
+
+    border-radius: 8px;
+
+    background-color: white;
+
+    color: #222222;
+
+    font-size: 13px;
+
+    font-weight: bold;
+
+}
+
+
+/* ============================================================
+   48. HISTORY PANEL
+   ============================================================ */
+
+.stock-history-panel {
+
+    display: none;
+
+    margin-top: 10px;
+
+    background-color: #eeeeee;
+
+    border-radius: 8px;
+
+    padding: 10px;
+
+}
+
+
+.stock-history-panel.show {
+
+    display: block;
+
+}
+
+
+.stock-history-entry {
+
+    background-color: white;
+
+    border-radius: 7px;
+
+    padding: 10px;
+
+    margin-bottom: 7px;
+
+}
+
+
+.stock-history-entry:last-child {
+
+    margin-bottom: 0;
+
+}
+
+
+.stock-history-entry strong {
+
+    display: block;
+
+    font-size: 13px;
+
+    margin-bottom: 4px;
+
+}
+
+
+.stock-history-entry span {
+
+    display: block;
+
+    color: #666666;
+
+    font-size: 11px;
+
+    margin-top: 2px;
+
+}
+
+
+/* ============================================================
+   49. STOCK TAKE EMPTY / ERROR
+   ============================================================ */
+
+.stock-take-list > p {
+
+    background-color: white;
+
+    padding: 25px;
+
+    border-radius: 10px;
+
+    text-align: center;
+
+    color: #777777;
+
+}
+
+
+/* ============================================================
+   50. STOCK MOBILE
+   ============================================================ */
+
+@media (max-width: 600px) {
+
+    .stock-product-row {
+
+        padding: 13px;
+
+    }
+
+
+    .stock-summary {
+
+        grid-template-columns:
+            repeat(3, 1fr);
+
+        gap: 5px;
+
+    }
+
+
+    .stock-summary-box {
+
+        padding: 8px 4px;
+
+    }
+
+
+    .stock-summary-box strong {
+
+        font-size: 17px;
+
+    }
+
+
+    .stock-product-info strong {
+
+        font-size: 17px;
+
+    }
+
+}
+
+
+/* ============================================================
+   51. VERY SMALL PHONES
+   ============================================================ */
+
+@media (max-width: 400px) {
+
+    .main-logo {
+
+        width: 125px;
+
+    }
+
+
+    .scanner-buttons button {
+
+        font-size: 13px;
+
+        padding: 11px;
+
+    }
+
+
+    .product-row {
+
+        padding: 10px;
+
+    }
+
+
+    .product-information strong {
+
+        font-size: 15px;
+
+    }
+
+
+    .product-price {
+
+        font-size: 14px;
+
+    }
+
+
+    .stock-summary-box span {
+
+        font-size: 10px;
+
+    }
+
+
+    .stock-summary-box strong {
+
+        font-size: 16px;
+
+    }
+
+}
+
+
+/* ============================================================
+   52. BUTTON PRESS
+   ============================================================ */
+
+button:active {
+
+    transform: scale(0.98);
+
+}
+/* ============================================================
+   STOCK CONTROL REPORTS
+   ============================================================ */
+
+.stock-report-tabs {
+
+    display: flex;
+
+    gap: 6px;
+
+    padding: 8px;
+
+    background-color: #ffffff;
+
+    border-bottom: 1px solid #dddddd;
+
+    overflow-x: auto;
+
+    flex-shrink: 0;
+
+}
+
+
+.stock-tab {
+
+    flex: 1;
+
+    min-width: 120px;
+
+    padding: 12px 10px;
+
+    border: 1px solid #cccccc;
+
+    border-radius: 8px;
+
+    background-color: #ffffff;
+
+    color: #222222;
+
+    font-size: 13px;
+
+    font-weight: bold;
+
+}
+
+
+.stock-tab.active {
+
+    background-color: #222222;
+
+    color: #ffffff;
+
+    border-color: #222222;
+
+}
+
+
+.stock-report-content {
+
+    flex: 1;
+
+    overflow-y: auto;
+
+    padding: 12px;
+
+    background-color: #eeeeee;
+
+}
+
+
+.report-heading {
+
+    margin-bottom: 12px;
+
+}
+
+
+.report-heading h3 {
+
+    font-size: 24px;
+
+    margin-bottom: 4px;
+
+}
+
+
+.report-heading p {
+
+    color: #777777;
+
+    font-size: 14px;
+
+}
+
+
+/* ============================================================
+   CURRENT STOCK CARD
+   ============================================================ */
+
+.stock-report-card {
+
+    background-color: #ffffff;
+
+    border-radius: 12px;
+
+    padding: 16px;
+
+    margin-bottom: 10px;
+
+}
+
+
+.stock-report-title {
+
+    display: flex;
+
+    justify-content: space-between;
+
+    align-items: center;
+
+}
+
+
+.stock-report-title strong {
+
+    display: block;
+
+    font-size: 20px;
+
+}
+
+
+.stock-report-title span {
+
+    display: block;
+
+    margin-top: 5px;
+
+    color: #777777;
+
+    font-size: 14px;
+
+}
+
+
+.stock-report-divider {
+
+    height: 1px;
+
+    background-color: #eeeeee;
+
+    margin: 14px 0;
+
+}
+
+
+.stock-report-grid {
+
+    display: grid;
+
+    grid-template-columns:
+        repeat(3, 1fr);
+
+    gap: 8px;
+
+}
+
+
+.report-stat {
+
+    background-color: #eeeeee;
+
+    border-radius: 10px;
+
+    padding: 12px;
+
+    text-align: center;
+
+}
+
+
+.report-stat span {
+
+    display: block;
+
+    color: #777777;
+
+    font-size: 10px;
+
+    margin-bottom: 6px;
+
+}
+
+
+.report-stat strong {
+
+    font-size: 20px;
+
+}
+
+
+/* ============================================================
+   MOVEMENT HISTORY
+   ============================================================ */
+
+.movement-card {
+
+    background-color: #ffffff;
+
+    border-radius: 12px;
+
+    padding: 15px;
+
+    margin-bottom: 10px;
+
+}
+
+
+.movement-top {
+
+    display: flex;
+
+    justify-content: space-between;
+
+    gap: 10px;
+
+    align-items: flex-start;
+
+}
+
+
+.movement-top strong {
+
+    font-size: 17px;
+
+}
+
+
+.movement-top span {
+
+    color: #777777;
+
+    font-size: 11px;
+
+    text-align: right;
+
+}
+
+
+.movement-type {
+
+    display: inline-block;
+
+    margin-top: 8px;
+
+    padding: 5px 8px;
+
+    border-radius: 6px;
+
+    background-color: #eeeeee;
+
+    font-size: 11px;
+
+    font-weight: bold;
+
+}
+
+
+.movement-grid {
+
+    display: grid;
+
+    grid-template-columns:
+        repeat(5, 1fr);
+
+    gap: 5px;
+
+    margin-top: 14px;
+
+}
+
+
+.movement-grid div {
+
+    text-align: center;
+
+    background-color: #f1f1f1;
+
+    border-radius: 7px;
+
+    padding: 8px 4px;
+
+}
+
+
+.movement-grid span {
+
+    display: block;
+
+    color: #777777;
+
+    font-size: 9px;
+
+    margin-bottom: 4px;
+
+}
+
+
+.movement-grid strong {
+
+    font-size: 15px;
+
+}
+
+
+.movement-reason {
+
+    margin-top: 12px;
+
+    padding-top: 10px;
+
+    border-top: 1px solid #eeeeee;
+
+}
+
+
+.movement-reason span {
+
+    color: #777777;
+
+    font-size: 11px;
+
+}
+
+
+.movement-reason p {
+
+    margin-top: 4px;
+
+    font-size: 13px;
+
+}
+
+
+/* ============================================================
+   STOCKTAKE HISTORY
+   ============================================================ */
+
+.stocktake-history-card {
+
+    background-color: #ffffff;
+
+    border-radius: 12px;
+
+    padding: 15px;
+
+    margin-bottom: 10px;
+
+}
+
+
+.stocktake-history-grid {
+
+    display: grid;
+
+    grid-template-columns:
+        repeat(3, 1fr);
+
+    gap: 8px;
+
+    margin-top: 14px;
+
+}
+
+
+.stocktake-history-grid div {
+
+    background-color: #eeeeee;
+
+    border-radius: 8px;
+
+    padding: 12px;
+
+    text-align: center;
+
+}
+
+
+.stocktake-history-grid span {
+
+    display: block;
+
+    color: #777777;
+
+    font-size: 10px;
+
+    margin-bottom: 5px;
+
+}
+
+
+.stocktake-history-grid strong {
+
+    font-size: 20px;
+
+}
+
+
+/* ============================================================
+   REPORT STATES
+   ============================================================ */
+
+.report-loading,
+.report-empty,
+.report-error {
+
+    background-color: #ffffff;
+
+    border-radius: 10px;
+
+    padding: 25px;
+
+    text-align: center;
+
+    color: #777777;
+
+}
+
+
+/* ============================================================
+   MOBILE
+   ============================================================ */
+
+@media (max-width: 600px) {
+
+    .stock-report-grid {
+
+        grid-template-columns:
+            repeat(3, 1fr);
+
+    }
+
+
+    .report-stat {
+
+        padding: 10px 5px;
+
+    }
+
+
+    .report-stat span {
+
+        font-size: 8px;
+
+    }
+
+
+    .report-stat strong {
+
+        font-size: 18px;
+
+    }
+
+
+    .movement-grid {
+
+        grid-template-columns:
+            repeat(3, 1fr);
+
+    }
+
+
+    .movement-grid div:nth-child(4) {
+
+        grid-column: span 1;
+
+    }
+
+
+    .movement-grid div:nth-child(5) {
+
+        grid-column: span 1;
+
+    }
+
+
+    .movement-top {
+
+        flex-direction: column;
+
+    }
+
+
+    .movement-top span {
+
+        text-align: left;
+
+    }
+
+}
+
+
+@media (max-width: 400px) {
+
+    .stock-report-tabs {
+
+        gap: 4px;
+
+    }
+
+
+    .stock-tab {
+
+        min-width: 105px;
+
+        font-size: 11px;
+
+        padding: 10px 6px;
+
+    }
+
+
+    .stock-report-content {
+
+        padding: 8px;
+
+    }
+
+}
+/* ============================================================
+   MONTHLY STOCK REPORTS
+   ============================================================ */
+
+.monthly-report-form {
+
+    background-color: #ffffff;
+
+    border-radius: 12px;
+
+    padding: 16px;
+
+    margin-bottom: 18px;
+
+}
+
+
+.monthly-report-form label {
+
+    display: block;
+
+    margin-bottom: 7px;
+
+    font-size: 14px;
+
+    font-weight: bold;
+
+}
+
+
+.monthly-report-input {
+
+    width: 100%;
+
+    padding: 14px;
+
+    margin-bottom: 14px;
+
+    border: 1px solid #cccccc;
+
+    border-radius: 9px;
+
+    background-color: #ffffff;
+
+    color: #222222;
+
+    font-size: 17px;
+
+    outline: none;
+
+}
+
+
+.monthly-report-input:focus {
+
+    border: 2px solid #222222;
+
+}
+
+
+.monthly-report-help {
+
+    margin-top: -5px;
+
+    margin-bottom: 12px;
+
+    color: #777777;
+
+    font-size: 12px;
+
+}
+
+
+.monthly-report-save-button {
+
+    width: 100%;
+
+    padding: 15px;
+
+    border: none;
+
+    border-radius: 9px;
+
+    background-color: #222222;
+
+    color: #ffffff;
+
+    font-size: 15px;
+
+    font-weight: bold;
+
+}
+
+
+.monthly-report-save-button:disabled {
+
+    opacity: 0.6;
+
+}
+
+
+.monthly-report-status {
+
+    min-height: 20px;
+
+    margin-top: 10px;
+
+    color: #555555;
+
+    font-size: 13px;
+
+    text-align: center;
+
+}
+
+
+.monthly-history-heading {
+
+    margin-top: 18px;
+
+}
+
+
+.monthly-report-card {
+
+    background-color: #ffffff;
+
+    border-radius: 12px;
+
+    padding: 15px;
+
+    margin-bottom: 12px;
+
+}
+
+
+.monthly-report-card-header {
+
+    display: flex;
+
+    justify-content: space-between;
+
+    align-items: flex-start;
+
+    gap: 10px;
+
+}
+
+
+.monthly-report-card-header div {
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 4px;
+
+}
+
+
+.monthly-report-card-header strong {
+
+    font-size: 19px;
+
+}
+
+
+.monthly-report-card-header span {
+
+    color: #777777;
+
+    font-size: 11px;
+
+}
+
+
+.monthly-loss-value {
+
+    font-size: 18px !important;
+
+}
+
+
+.monthly-report-grid {
+
+    display: grid;
+
+    grid-template-columns: repeat(2, 1fr);
+
+    gap: 8px;
+
+    margin-top: 14px;
+
+}
+
+
+.damaged-report-list {
+
+    margin-top: 12px;
+
+    padding-top: 12px;
+
+    border-top: 1px solid #eeeeee;
+
+}
+
+
+.damaged-report-list > strong {
+
+    display: block;
+
+    margin-bottom: 8px;
+
+    font-size: 14px;
+
+}
+
+
+.damaged-report-item {
+
+    display: flex;
+
+    justify-content: space-between;
+
+    gap: 10px;
+
+    padding: 9px 0;
+
+    border-bottom: 1px solid #eeeeee;
+
+    font-size: 12px;
+
+}
+
+
+.damaged-report-item:last-child {
+
+    border-bottom: none;
+
+}
+
+
+.damaged-report-item span {
+
+    color: #444444;
+
+}
+
+
+.damaged-report-item strong {
+
+    white-space: nowrap;
+
+}
+
+
+@media (max-width: 400px) {
+
+    .monthly-report-grid {
+
+        grid-template-columns: 1fr 1fr;
+
+        gap: 5px;
+
+    }
+
+    .monthly-report-card {
+
+        padding: 12px;
+
+    }
+
+    .monthly-report-card-header {
+
+        flex-direction: column;
+
+    }
+
+}
+
+
+/* ============================================================
+   OPTIONAL SALE FEE + CHECKOUT BREAKDOWN
+   ============================================================ */
+
+.checkout-total-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 7px 0;
+}
+
+.final-total-row {
+    margin-top: 8px;
+    padding-top: 12px;
+    border-top: 1px solid #dddddd;
+    font-size: 18px;
+}
+
+.sale-fee-label {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    margin-top: 12px;
+    font-weight: bold;
+}
+
+.sale-fee-label span {
+    font-size: 11px;
+    font-weight: normal;
+    color: #777777;
+}
+
+.sale-fee-input-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 7px;
+    padding: 9px 11px;
+    background: #f4f4f4;
+    border-radius: 8px;
+}
+
+.sale-fee-input-row input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    font-size: 17px;
+    outline: none;
+}
+.header-content {
+    max-width: 1100px;
+    margin: auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+}
+
+.btn-logout {
+    background: #b42318;
+    color: white;
+}
+/* ============================================================
+   EDIT PRODUCT BUTTON
+   ============================================================ */
+
+.edit-button {
+
+    padding: 9px 12px;
+
+    border: none;
+
+    border-radius: 8px;
+
+    background-color: #eeeeee;
+
+    color: #222222;
+
+    font-size: 13px;
+
+    font-weight: bold;
+
+    cursor: pointer;
+
+}
+/* ============================================================
+   POS BARCODE SCANNER
+   ============================================================ */
+
+.scanner-window {
+
+    position: fixed;
+
+    top: 0;
+    left: 0;
+
+    width: 100%;
+    height: 100%;
+
+    background-color: #eeeeee;
+
+    z-index: 6000;
+
+    display: none;
+
+    flex-direction: column;
+
+}
+
+
+.scanner-window.show {
+
+    display: flex;
+
+}
+
+
+.scanner-header {
+
+    background-color: #222222;
+
+    color: white;
+
+    min-height: 75px;
+
+    padding: 15px 20px;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+}
+
+
+.scanner-header h2 {
+
+    margin: 0;
+
+    font-size: 24px;
+
+}
+
+
+.scanner-header span {
+
+    display: block;
+
+    margin-top: 4px;
+
+    color: #cccccc;
+
+    font-size: 13px;
+
+}
+
+
+#close-scanner {
+
+    width: 42px;
+
+    height: 42px;
+
+    border: none;
+
+    border-radius: 50%;
+
+    background-color: white;
+
+    color: #222222;
+
+    font-size: 28px;
+
+    cursor: pointer;
+
+}
+
+
+.scanner-content {
+
+    flex: 1;
+
+    display: flex;
+
+    flex-direction: column;
+
+    justify-content: center;
+
+    padding: 20px;
+
+}
+
+
+.scanner-camera-box {
+
+    position: relative;
+
+    width: 100%;
+
+    overflow: hidden;
+
+    border-radius: 16px;
+
+    background-color: #111111;
+
+}
+
+
+#scanner-video {
+
+    width: 100%;
+
+    display: block;
+
+    max-height: 65vh;
+
+    object-fit: cover;
+
+}
+
+
+.scanner-line {
+
+    position: absolute;
+
+    left: 10%;
+    width: 80%;
+
+    top: 50%;
+
+    height: 2px;
+
+    background-color: #ffffff;
+
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+
+}
+
+
+.scanner-status {
+
+    text-align: center;
+
+    margin-top: 20px;
+
+    color: #555555;
+
+    font-size: 15px;
+
+}
+
+/* ============================================================
+   TOP RIGHT BARCODE SCANNER BUTTON
+   ============================================================ */
+
+.top-section {
+    position: relative;
+}
+
+
+.top-right-scanner {
+    position: absolute;
+
+    top: 12px;
+    right: 12px;
+
+    z-index: 20;
+
+    padding: 10px 14px;
+
+    border: none;
+    border-radius: 10px;
+
+    font-size: 14px;
+    font-weight: bold;
+
+    cursor: pointer;
+
+    box-shadow:
+        0 2px 8px rgba(0, 0, 0, 0.18);
+}
+
+
+.top-right-scanner:active {
+    transform: scale(0.96);
+}
