@@ -39,14 +39,24 @@ from store_database import create_store_database
 
 BASE_DIR = Path(__file__).resolve().parent
 
-# Uses the normal database folder on Pydroid/local development.
-# On Render we will set EASY_SALES_DATA_DIR to persistent storage.
-LIVE_DATA_DIR = Path(
-    os.environ.get(
-        "EASY_SALES_DATA_DIR",
-        str(BASE_DIR / "database")
+# Explicit configuration wins. Otherwise automatically use the Render
+# persistent disk when it is mounted at /var/data. Local Pydroid keeps
+# using the project's database folder.
+_configured_data_dir = os.environ.get(
+    "EASY_SALES_DATA_DIR",
+    ""
+).strip()
+
+if _configured_data_dir:
+    LIVE_DATA_DIR = Path(
+        os.path.abspath(
+            os.path.expanduser(_configured_data_dir)
+        )
     )
-)
+elif os.path.isdir("/var/data"):
+    LIVE_DATA_DIR = Path("/var/data")
+else:
+    LIVE_DATA_DIR = BASE_DIR / "database"
 
 LIVE_DATA_DIR.mkdir(
     parents=True,
