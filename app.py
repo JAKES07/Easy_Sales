@@ -1610,11 +1610,7 @@ create_database()
 # Store controller database (permanent client store spaces).
 init_controller()
 
-# Register the Store ID + passkey gateway.
-app.register_blueprint(store_access_bp)
 
-# Register the Easy Sales owner/controller dashboard.
-app.register_blueprint(controller_bp)
 
 
 # ============================================================
