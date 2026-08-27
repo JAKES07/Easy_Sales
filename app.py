@@ -1747,60 +1747,6 @@ def get_products():
                 "Could not load products."
 
         }), 500
-# ============================================================
-# FIND PRODUCT BY BARCODE
-# ============================================================
-
-@app.route(
-    "/api/products/barcode/<path:barcode>",
-    methods=["GET"]
-)
-def find_product_by_barcode(barcode):
-
-    barcode = str(barcode).strip()
-
-    if not barcode:
-        return jsonify({
-            "success": False,
-            "message": "Barcode is required."
-        }), 400
-
-    try:
-
-        print("EASY SALES BARCODE LOOKUP:", repr(barcode))
-
-        product = get_product_by_barcode(barcode)
-
-        if not product:
-
-            print("BARCODE NOT FOUND:", repr(barcode))
-
-            return jsonify({
-                "success": False,
-                "message": "No product is registered with this barcode."
-            }), 404
-
-        print(
-            "BARCODE PRODUCT FOUND:",
-            product["name"]
-        )
-
-        return jsonify({
-            "success": True,
-            "product": product
-        })
-
-    except Exception as error:
-
-        print(
-            "BARCODE LOOKUP ERROR:",
-            error
-        )
-
-        return jsonify({
-            "success": False,
-            "message": "Could not look up barcode."
-        }), 500
 
 # ============================================================
 # ADD NEW PRODUCT
