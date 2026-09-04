@@ -15,6 +15,16 @@ let cart = [];
 // ============================================================
 
 let selectedPaymentMethod = "cash";
+let storeCurrency = {
+    code: "",
+    symbol: "",
+    name: ""
+};
+
+function formatMoney(value) {
+    const amount = Number(value || 0);
+    return (storeCurrency.symbol || "") + amount.toFixed(2);
+}
 
 
 // ============================================================
@@ -25,12 +35,114 @@ document.addEventListener(
     "DOMContentLoaded",
     function() {
 
-        loadProducts();
+        initializeCurrency().then(function() {
+            loadProducts();
+        });
 
         setupButtons();
 
     }
 );
+
+
+// ============================================================
+// 4. STORE CURRENCY SETUP
+// ============================================================
+
+async function initializeCurrency() {
+    try {
+        const response = await fetch("/api/settings/currency?t=" + Date.now());
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+            throw new Error(data.message || "Could not load currency settings.");
+        }
+
+        if (data.currency) {
+            storeCurrency = {
+                code: data.currency.currency_code || "",
+                symbol: data.currency.currency_symbol || "",
+                name: data.currency.currency_name || ""
+            };
+            updateCurrencyLabels();
+            return;
+        }
+
+        openCurrencySetup(data.currencies || []);
+    } catch (error) {
+        console.error("CURRENCY SETUP ERROR:", error);
+        showMessage("Could not load store currency settings.");
+    }
+}
+
+function openCurrencySetup(currencies) {
+    const windowElement = document.getElementById("currency-setup-window");
+    const select = document.getElementById("store-currency-select");
+    const saveButton = document.getElementById("save-store-currency");
+    const message = document.getElementById("currency-setup-message");
+
+    if (!windowElement || !select || !saveButton) return;
+
+    select.innerHTML = "<option value=\"\">Select your store currency...</option>";
+    currencies.forEach(function(currency) {
+        const option = document.createElement("option");
+        option.value = currency.code;
+        option.textContent = currency.code + " — " + currency.name + " (" + currency.symbol + ")";
+        select.appendChild(option);
+    });
+
+    windowElement.classList.add("show");
+
+    saveButton.onclick = async function() {
+        const code = select.value;
+        if (!code) {
+            if (message) message.textContent = "Please select a currency.";
+            return;
+        }
+
+        saveButton.disabled = true;
+        saveButton.textContent = "Saving...";
+        if (message) message.textContent = "";
+
+        try {
+            const response = await fetch("/api/settings/currency", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ currency_code: code })
+            });
+            const data = await response.json();
+
+            if (!response.ok || !data.success) {
+                throw new Error(data.message || "Could not save currency.");
+            }
+
+            storeCurrency = {
+                code: data.currency.currency_code,
+                symbol: data.currency.currency_symbol,
+                name: data.currency.currency_name
+            };
+
+            updateCurrencyLabels();
+            windowElement.classList.remove("show");
+            await loadProducts();
+        } catch (error) {
+            if (message) message.textContent = error.message;
+        } finally {
+            saveButton.disabled = false;
+            saveButton.textContent = "Save Currency";
+        }
+    };
+}
+
+function updateCurrencyLabels() {
+    updateCartTotal();
+    updateCheckoutTotals();
+    const change = document.getElementById("change-amount");
+    if (change && change.textContent) {
+        const numeric = parseFloat(String(change.textContent).replace(/[^0-9.-]/g, ""));
+        if (!isNaN(numeric)) change.textContent = formatMoney(numeric);
+    }
+}
 
 
 // ============================================================
@@ -128,7 +240,7 @@ function displayProducts(products) {
             </div>
 
             <div class="product-price">
-                R${Number(product.price).toFixed(2)}
+                ${formatMoney(product.price)}
             </div>
 
             <button
@@ -136,6 +248,15 @@ function displayProducts(products) {
                 type="button">
 
                 EDIT
+
+            </button>
+
+            <button
+                class="remove-product-button"
+                type="button"
+                title="Remove product tile">
+
+                REMOVE
 
             </button>
 
@@ -180,7 +301,103 @@ function displayProducts(products) {
 
         }
 
+        const removeButton =
+            row.querySelector(
+                ".remove-product-button"
+            );
+
+        if (removeButton) {
+
+            removeButton.addEventListener(
+                "click",
+                function(event) {
+
+                    event.stopPropagation();
+                    removeProductTile(product);
+
+                }
+            );
+
+        }
+
     });
+
+}
+
+
+// ============================================================
+// 6. REMOVE PRODUCT TILE (KEEP HISTORY)
+// ============================================================
+
+async function removeProductTile(product) {
+
+    if (!product || !product.id) {
+        return;
+    }
+
+    const confirmed = window.confirm(
+        "Remove this product tile from Easy Sales?\n\n" +
+        product.name +
+        "\n\n" +
+        "The product will NOT be deleted. " +
+        "Its sales and stock movement history will be retained."
+    );
+
+    if (!confirmed) {
+        return;
+    }
+
+    try {
+
+        const response = await fetch(
+            "/api/products/" +
+            encodeURIComponent(product.id) +
+            "/remove",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({})
+            }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+            showMessage(
+                data.message ||
+                "Could not remove product tile."
+            );
+            return;
+        }
+
+        // If the product is currently in the cart, remove it too.
+        cart = cart.filter(function(item) {
+            return Number(item.id) !== Number(product.id);
+        });
+
+        updateCart();
+        await loadProducts();
+
+        showMessage(
+            product.name +
+            " removed from the product tiles. " +
+            "History retained."
+        );
+
+    } catch (error) {
+
+        console.error(
+            "REMOVE PRODUCT TILE ERROR:",
+            error
+        );
+
+        showMessage(
+            "Could not remove product tile."
+        );
+
+    }
 
 }
 
@@ -335,7 +552,7 @@ function displayCart() {
                 </strong>
 
                 <span>
-                    R${product.price.toFixed(2)} each
+                    ${formatMoney(product.price)} each
                 </span>
 
             </div>
@@ -361,7 +578,7 @@ function displayCart() {
             </div>
 
             <strong class="cart-item-total">
-                R${itemTotal.toFixed(2)}
+                ${formatMoney(itemTotal)}
             </strong>
 
         `;
@@ -488,8 +705,7 @@ function updateCartTotal() {
     if (totalElement) {
 
         totalElement.textContent =
-            "R" +
-            getCartTotal().toFixed(2);
+            formatMoney(getCartTotal());
 
     }
 
@@ -1422,13 +1638,28 @@ async function showCurrentStockReport() {
 
         <div class="report-heading">
 
-            <h3>
-                Current Stock
-            </h3>
+            <div class="report-heading-row">
 
-            <p>
-                Current inventory position
-            </p>
+                <div>
+                    <h3>
+                        Current Stock
+                    </h3>
+
+                    <p>
+                        Current inventory position
+                    </p>
+                </div>
+
+                <button
+                    type="button"
+                    class="stock-pdf-button"
+                    onclick="downloadStockReportPDF()">
+
+                    📄 DOWNLOAD PDF
+
+                </button>
+
+            </div>
 
         </div>
 
@@ -1524,9 +1755,7 @@ async function showCurrentStockReport() {
                                     <span>
 
                                         Selling Price:
-                                        R${Number(
-                                            product.price
-                                        ).toFixed(2)}
+                                        ${formatMoney(product.price)}
 
                                     </span>
 
@@ -1576,9 +1805,7 @@ async function showCurrentStockReport() {
 
                                     <strong>
 
-                                        R${Number(
-                                            product.sales_today
-                                        ).toFixed(2)}
+                                        ${formatMoney(product.sales_today)}
 
                                     </strong>
 
@@ -1619,6 +1846,28 @@ async function showCurrentStockReport() {
         `;
 
     }
+
+}
+
+
+// ============================================================
+// DOWNLOAD COMPLETE STOCK CONTROL PDF
+// ============================================================
+
+function downloadStockReportPDF() {
+
+    const link = document.createElement("a");
+
+    link.href =
+        "/api/stock-report/pdf?t=" +
+        Date.now();
+
+    link.download =
+        "Easy_Sales_Stock_Control_Report.pdf";
+
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
 
 }
 
@@ -2110,9 +2359,7 @@ async function loadMonthlySalesSummary() {
                     <strong>
                         ${summary.cash_sales_count || 0}
                         &nbsp;—&nbsp;
-                        R${Number(
-                            summary.cash_sales_amount || 0
-                        ).toFixed(2)}
+                        ${formatMoney(summary.cash_sales_amount)}
                     </strong>
                 </div>
 
@@ -2121,9 +2368,7 @@ async function loadMonthlySalesSummary() {
                     <strong>
                         ${summary.card_sales_count || 0}
                         &nbsp;—&nbsp;
-                        R${Number(
-                            summary.card_sales_amount || 0
-                        ).toFixed(2)}
+                        ${formatMoney(summary.card_sales_amount)}
                     </strong>
                 </div>
 
@@ -2132,9 +2377,7 @@ async function loadMonthlySalesSummary() {
                     <strong>
                         ${summary.total_sales_count || 0}
                         &nbsp;—&nbsp;
-                        R${Number(
-                            summary.total_sales_amount || 0
-                        ).toFixed(2)}
+                        ${formatMoney(summary.total_sales_amount)}
                     </strong>
                 </div>
 
@@ -2148,9 +2391,7 @@ async function loadMonthlySalesSummary() {
                 <div class="report-stat">
                     <span>EXPECTED CASH</span>
                     <strong>
-                        R${Number(
-                            summary.cash_sales_amount || 0
-                        ).toFixed(2)}
+                        ${formatMoney(summary.cash_sales_amount)}
                     </strong>
                 </div>
 
@@ -2250,12 +2491,12 @@ async function saveMonthlyReport() {
             data.report || {};
 
         showMonthlyReportStatus(
-            "REPORT GENERATED — Expected Cash: R" +
-            Number(report.expected_cash || 0).toFixed(2) +
-            " | Actual Cash: R" +
-            Number(report.cash_at_hand || 0).toFixed(2) +
-            " | Variance: R" +
-            Number(report.cash_variance || 0).toFixed(2) +
+            "REPORT GENERATED — Expected Cash: " +
+            formatMoney(report.expected_cash) +
+            " | Actual Cash: " +
+            formatMoney(report.cash_at_hand) +
+            " | Variance: " +
+            formatMoney(report.cash_variance) +
             " | Damaged Units: " +
             (report.damaged_units || 0)
         );
@@ -2740,8 +2981,7 @@ async function loadMonthlyReports() {
 
             const varianceText =
                 (cashVariance >= 0 ? "+" : "") +
-                "R" +
-                cashVariance.toFixed(2);
+                formatMoney(Math.abs(cashVariance));
 
             let damagedHtml =
                 "<p>No damaged goods recorded.</p>";
@@ -2768,9 +3008,7 @@ async function loadMonthlyReports() {
                                     <strong>
                                         ${item.quantity}
                                         &nbsp;—&nbsp;
-                                        R${Number(
-                                            item.value
-                                        ).toFixed(2)}
+                                        ${formatMoney(item.value)}
                                     </strong>
 
                                 </div>
@@ -2805,9 +3043,7 @@ async function loadMonthlyReports() {
                         </div>
 
                         <strong class="monthly-loss-value">
-                            R${Number(
-                                report.total_loss
-                            ).toFixed(2)}
+                            ${formatMoney(report.total_loss)}
                         </strong>
 
                     </div>
@@ -2816,16 +3052,12 @@ async function loadMonthlyReports() {
 
                         <div class="report-stat">
                             <span>EXPECTED CASH</span>
-                            <strong>R${Number(
-                                report.expected_cash || 0
-                            ).toFixed(2)}</strong>
+                            <strong>${formatMoney(report.expected_cash)}</strong>
                         </div>
 
                         <div class="report-stat">
                             <span>CASH AT HAND</span>
-                            <strong>R${Number(
-                                report.cash_at_hand || 0
-                            ).toFixed(2)}</strong>
+                            <strong>${formatMoney(report.cash_at_hand)}</strong>
                         </div>
 
                         <div class="report-stat">
@@ -2835,23 +3067,17 @@ async function loadMonthlyReports() {
 
                         <div class="report-stat">
                             <span>CASH SALES</span>
-                            <strong>${report.cash_sales_count || 0} — R${Number(
-                                report.cash_sales_amount || 0
-                            ).toFixed(2)}</strong>
+                            <strong>${report.cash_sales_count || 0} — ${formatMoney(report.cash_sales_amount)}</strong>
                         </div>
 
                         <div class="report-stat">
                             <span>CARD SALES</span>
-                            <strong>${report.card_sales_count || 0} — R${Number(
-                                report.card_sales_amount || 0
-                            ).toFixed(2)}</strong>
+                            <strong>${report.card_sales_count || 0} — ${formatMoney(report.card_sales_amount)}</strong>
                         </div>
 
                         <div class="report-stat">
                             <span>TOTAL SALES</span>
-                            <strong>${report.total_sales_count || 0} — R${Number(
-                                report.total_sales_amount || 0
-                            ).toFixed(2)}</strong>
+                            <strong>${report.total_sales_count || 0} — ${formatMoney(report.total_sales_amount)}</strong>
                         </div>
 
                         <div class="report-stat">
@@ -2866,9 +3092,7 @@ async function loadMonthlyReports() {
 
                         <div class="report-stat">
                             <span>STOCK VALUE</span>
-                            <strong>R${Number(
-                                report.stock_value
-                            ).toFixed(2)}</strong>
+                            <strong>${formatMoney(report.stock_value)}</strong>
                         </div>
 
                         <div class="report-stat">
@@ -2878,16 +3102,12 @@ async function loadMonthlyReports() {
 
                         <div class="report-stat">
                             <span>DAMAGED VALUE</span>
-                            <strong>R${Number(
-                                report.damaged_value
-                            ).toFixed(2)}</strong>
+                            <strong>${formatMoney(report.damaged_value)}</strong>
                         </div>
 
                         <div class="report-stat">
                             <span>TOTAL LOSS</span>
-                            <strong>R${Number(
-                                report.total_loss
-                            ).toFixed(2)}</strong>
+                            <strong>${formatMoney(report.total_loss)}</strong>
                         </div>
 
                     </div>
@@ -3774,11 +3994,11 @@ function updateCheckoutTotals() {
     const totalElement = document.getElementById("checkout-total");
 
     if (subtotalElement) {
-        subtotalElement.textContent = "R" + subtotal.toFixed(2);
+        subtotalElement.textContent = formatMoney(subtotal);
     }
 
     if (totalElement) {
-        totalElement.textContent = "R" + total.toFixed(2);
+        totalElement.textContent = formatMoney(total);
     }
 
     calculateChange();
@@ -3931,7 +4151,7 @@ function selectCashPayment() {
     if (change) {
 
         change.textContent =
-            "R0.00";
+            formatMoney(0);
 
     }
 
@@ -4039,13 +4259,12 @@ function calculateChange() {
     if (change >= 0) {
 
         output.textContent =
-            "R" +
-            change.toFixed(2);
+            formatMoney(change);
 
     } else {
 
         output.textContent =
-            "R0.00";
+            formatMoney(0);
 
     }
 
@@ -4204,7 +4423,7 @@ async function completeSale() {
         if (change) {
 
             change.textContent =
-                "R0.00";
+                formatMoney(0);
 
         }
 
