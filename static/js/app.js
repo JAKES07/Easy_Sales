@@ -1703,13 +1703,28 @@ async function showCurrentStockReport() {
 
             <div class="report-heading">
 
-                <h3>
-                    Current Stock
-                </h3>
+                <div class="report-heading-row">
 
-                <p>
-                    Current inventory position
-                </p>
+                    <div>
+                        <h3>
+                            Current Stock
+                        </h3>
+
+                        <p>
+                            Current inventory position
+                        </p>
+                    </div>
+
+                    <button
+                        type="button"
+                        class="stock-pdf-button"
+                        onclick="downloadStockReportPDF()">
+
+                        📄 DOWNLOAD PDF
+
+                    </button>
+
+                </div>
 
             </div>
 
