@@ -778,6 +778,36 @@ function setupButtons() {
     }
 
 
+    const scanProductBarcodeButton =
+        document.getElementById(
+            "scan-product-barcode"
+        );
+
+    if (scanProductBarcodeButton) {
+
+        scanProductBarcodeButton.addEventListener(
+            "click",
+            openAddProductBarcodeScanner
+        );
+
+    }
+
+
+    const closeAddProductScannerButton =
+        document.getElementById(
+            "close-add-product-scanner"
+        );
+
+    if (closeAddProductScannerButton) {
+
+        closeAddProductScannerButton.addEventListener(
+            "click",
+            closeAddProductBarcodeScanner
+        );
+
+    }
+
+
     const closeAddProductButton =
         document.getElementById(
             "close-add-product"
@@ -1077,7 +1107,270 @@ function closeAddProduct() {
 
 
 // ============================================================
-// 15. SAVE PRODUCT
+// 15. ADD PRODUCT BARCODE SCANNER
+// ============================================================
+
+let addProductScannerStream = null;
+let addProductBarcodeDetector = null;
+let addProductScannerRunning = false;
+let addProductBarcodeDetected = false;
+
+
+async function openAddProductBarcodeScanner() {
+
+    const scannerWindow =
+        document.getElementById(
+            "add-product-scanner-window"
+        );
+
+    const scannerVideo =
+        document.getElementById(
+            "add-product-scanner-video"
+        );
+
+    const scannerStatus =
+        document.getElementById(
+            "add-product-scanner-status"
+        );
+
+    if (!scannerWindow || !scannerVideo || !scannerStatus) {
+        console.error(
+            "Add Product barcode scanner elements were not found."
+        );
+        return;
+    }
+
+    addProductBarcodeDetected = false;
+    addProductScannerRunning = false;
+
+    scannerWindow.classList.add("show");
+    scannerStatus.textContent = "Opening camera...";
+
+    try {
+
+        if (
+            !navigator.mediaDevices ||
+            !navigator.mediaDevices.getUserMedia
+        ) {
+            scannerStatus.textContent =
+                "Camera access is not supported by this browser.";
+            return;
+        }
+
+        addProductScannerStream =
+            await navigator.mediaDevices.getUserMedia({
+                video: {
+                    facingMode: { ideal: "environment" },
+                    width: { ideal: 1920 },
+                    height: { ideal: 1080 }
+                },
+                audio: false
+            });
+
+        scannerVideo.srcObject = addProductScannerStream;
+
+        await new Promise(function(resolve) {
+            if (scannerVideo.readyState >= HTMLMediaElement.HAVE_METADATA) {
+                resolve();
+                return;
+            }
+
+            scannerVideo.onloadedmetadata = function() {
+                resolve();
+            };
+        });
+
+        await scannerVideo.play();
+
+        if (!("BarcodeDetector" in window)) {
+            scannerStatus.textContent =
+                "Barcode detection is not supported by this browser.";
+            return;
+        }
+
+        const supportedFormats =
+            await BarcodeDetector.getSupportedFormats();
+
+        const wantedFormats = [
+            "ean_13",
+            "ean_8",
+            "code_128",
+            "code_39",
+            "upc_a",
+            "upc_e"
+        ];
+
+        const formats = wantedFormats.filter(function(format) {
+            return supportedFormats.includes(format);
+        });
+
+        if (!formats.length) {
+            scannerStatus.textContent =
+                "No supported barcode formats were found.";
+            return;
+        }
+
+        addProductBarcodeDetector =
+            new BarcodeDetector({ formats: formats });
+
+        addProductScannerRunning = true;
+        scannerStatus.textContent =
+            "Scanning... hold the barcode inside the frame.";
+
+        scanAddProductBarcode();
+
+    } catch (error) {
+
+        console.error(
+            "ADD PRODUCT SCANNER ERROR:",
+            error
+        );
+
+        scannerStatus.textContent =
+            "Scanner error: " +
+            (error.message || "Could not open camera.");
+
+    }
+}
+
+
+async function scanAddProductBarcode() {
+
+    if (
+        !addProductScannerRunning ||
+        addProductBarcodeDetected
+    ) {
+        return;
+    }
+
+    const scannerVideo =
+        document.getElementById(
+            "add-product-scanner-video"
+        );
+
+    const scannerStatus =
+        document.getElementById(
+            "add-product-scanner-status"
+        );
+
+    if (!scannerVideo || !scannerStatus || !addProductBarcodeDetector) {
+        return;
+    }
+
+    if (
+        scannerVideo.readyState <
+        HTMLMediaElement.HAVE_ENOUGH_DATA
+    ) {
+        requestAnimationFrame(scanAddProductBarcode);
+        return;
+    }
+
+    try {
+
+        const barcodes =
+            await addProductBarcodeDetector.detect(scannerVideo);
+
+        if (barcodes.length > 0) {
+
+            const barcode =
+                String(barcodes[0].rawValue || "").trim();
+
+            if (!barcode) {
+                requestAnimationFrame(scanAddProductBarcode);
+                return;
+            }
+
+            addProductBarcodeDetected = true;
+            addProductScannerRunning = false;
+
+            const barcodeInput =
+                document.getElementById(
+                    "product-barcode"
+                );
+
+            const barcodeStatus =
+                document.getElementById(
+                    "add-product-barcode-status"
+                );
+
+            if (barcodeInput) {
+                barcodeInput.value = barcode;
+                barcodeInput.dispatchEvent(
+                    new Event("input", { bubbles: true })
+                );
+            }
+
+            if (barcodeStatus) {
+                barcodeStatus.textContent =
+                    "✓ Barcode scanned: " + barcode;
+            }
+
+            scannerStatus.textContent =
+                "✓ Barcode captured. Returning to Add Product...";
+
+            setTimeout(
+                closeAddProductBarcodeScanner,
+                500
+            );
+
+            return;
+        }
+
+    } catch (error) {
+
+        console.error(
+            "ADD PRODUCT BARCODE DETECTION ERROR:",
+            error
+        );
+
+    }
+
+    if (addProductScannerRunning && !addProductBarcodeDetected) {
+        requestAnimationFrame(scanAddProductBarcode);
+    }
+}
+
+
+function closeAddProductBarcodeScanner() {
+
+    addProductScannerRunning = false;
+    addProductBarcodeDetected = false;
+
+    if (addProductScannerStream) {
+
+        addProductScannerStream
+            .getTracks()
+            .forEach(function(track) {
+                track.stop();
+            });
+
+        addProductScannerStream = null;
+
+    }
+
+    const scannerVideo =
+        document.getElementById(
+            "add-product-scanner-video"
+        );
+
+    if (scannerVideo) {
+        scannerVideo.pause();
+        scannerVideo.srcObject = null;
+    }
+
+    const scannerWindow =
+        document.getElementById(
+            "add-product-scanner-window"
+        );
+
+    if (scannerWindow) {
+        scannerWindow.classList.remove("show");
+    }
+}
+
+
+// ============================================================
+// 16. SAVE PRODUCT
 // ============================================================
 
 async function saveProduct() {
