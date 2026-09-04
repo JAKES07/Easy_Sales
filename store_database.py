@@ -417,6 +417,13 @@ def reset_store_data(store_id):
             "DELETE FROM products"
         )
 
+        # Reset the store currency too. On the next store login,
+        # Easy Sales will show the currency setup popup again so the
+        # freshly reset store can choose its operating currency.
+        cursor.execute(
+            "DELETE FROM store_settings"
+        )
+
         connection.commit()
 
         return {
