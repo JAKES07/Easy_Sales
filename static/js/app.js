@@ -1869,20 +1869,31 @@ async function showCurrentStockReport() {
 // DOWNLOAD COMPLETE STOCK CONTROL PDF
 // ============================================================
 
-function downloadStockReportPDF() {
+async function downloadStockReportPDF() {
 
-    const link = document.createElement("a");
+    const button = document.querySelector(".stock-pdf-button");
+    const originalText = button ? button.innerHTML : "";
 
-    link.href =
-        "/api/stock-report/pdf?t=" +
-        Date.now();
+    try {
+        if (button) {
+            button.disabled = true;
+            button.innerHTML = "⏳ GENERATING PDF...";
+        }
 
-    link.download =
-        "Easy_Sales_Stock_Control_Report.pdf";
+        // Use a normal browser navigation to the PDF endpoint.
+        // This is more reliable on Android/Chrome than creating a
+        // synthetic download link for a Flask-generated PDF.
+        const url = "/api/stock-report/pdf?t=" + Date.now();
+        window.location.href = url;
 
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
+    } catch (error) {
+        console.error("STOCK PDF DOWNLOAD ERROR:", error);
+        alert("Could not download the stock control PDF.");
+        if (button) {
+            button.disabled = false;
+            button.innerHTML = originalText;
+        }
+    }
 
 }
 
