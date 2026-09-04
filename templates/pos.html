@@ -321,12 +321,25 @@
             Barcode
         </label>
 
-        <input
-            type="text"
-            id="product-barcode"
-            placeholder="Enter barcode..."
-            inputmode="numeric"
-        >
+        <div class="barcode-entry-row">
+
+            <input
+                type="text"
+                id="product-barcode"
+                placeholder="Enter barcode..."
+                inputmode="numeric"
+            >
+
+            <button
+                id="scan-product-barcode"
+                class="scan-product-barcode-button"
+                type="button">
+
+                📷 SCAN
+
+            </button>
+
+        </div>
 
 
         <div
@@ -352,6 +365,59 @@
 
 </div>
 
+
+
+<!-- ========================================================
+     ADD PRODUCT BARCODE SCANNER
+     ======================================================== -->
+
+<div
+    id="add-product-scanner-window"
+    class="scanner-window">
+
+    <div class="scanner-header">
+
+        <div>
+            <h2>Scan Barcode for Product</h2>
+            <span>Point the rear camera at the product barcode</span>
+        </div>
+
+        <button
+            id="close-add-product-scanner"
+            type="button">
+
+            ×
+
+        </button>
+
+    </div>
+
+    <div class="scanner-content">
+
+        <div class="scanner-camera-box">
+
+            <video
+                id="add-product-scanner-video"
+                autoplay
+                playsinline>
+
+            </video>
+
+            <div class="scanner-line"></div>
+
+        </div>
+
+        <p
+            id="add-product-scanner-status"
+            class="scanner-status">
+
+            Opening camera...
+
+        </p>
+
+    </div>
+
+</div>
 
 
 <!-- ========================================================
