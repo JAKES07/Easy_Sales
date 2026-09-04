@@ -525,7 +525,7 @@
             </strong>
 
             <strong id="cart-total">
-                R0.00
+                <span id="cart-total-value">0.00</span>
             </strong>
 
         </div>
@@ -593,7 +593,7 @@
 
             <div class="checkout-total-row">
                 <span>Subtotal</span>
-                <strong id="checkout-subtotal">R0.00</strong>
+                <strong id="checkout-subtotal">0.00</strong>
             </div>
 
             <label class="sale-fee-label" for="sale-fee">
@@ -608,7 +608,7 @@
 
             <div class="checkout-total-row final-total-row">
                 <span>Total to Pay</span>
-                <strong id="checkout-total">R0.00</strong>
+                <strong id="checkout-total">0.00</strong>
             </div>
 
         </div>
@@ -671,7 +671,7 @@
                 </span>
 
                 <strong id="change-amount">
-                    R0.00
+                    0.00
                 </strong>
 
             </div>
@@ -775,6 +775,32 @@
     src="{{ url_for('static', filename='js/app.js') }}">
 </script>
 
+
+
+<!-- ========================================================
+     FIRST-LOGIN STORE CURRENCY SETUP
+     ======================================================== -->
+<div id="currency-setup-window" class="owner-window">
+    <div class="owner-header">
+        <div>
+            <h2>Set Store Currency</h2>
+            <span>This store will operate from the currency you choose.</span>
+        </div>
+    </div>
+
+    <div class="add-product-content">
+        <label for="store-currency-select">Currency</label>
+        <select id="store-currency-select" style="width:100%;padding:14px;border:1px solid #ccc;border-radius:10px;font-size:16px;box-sizing:border-box;"></select>
+        <p style="margin:14px 0 0;color:#666;line-height:1.5;">
+            Prices, receipts, stock reports and sales reports will use this currency.
+            No exchange-rate conversion is performed.
+        </p>
+        <button id="save-store-currency" type="button" style="width:100%;margin-top:18px;padding:14px;border:0;border-radius:10px;background:#222;color:#fff;font-weight:bold;font-size:16px;cursor:pointer;">
+            Save Currency
+        </button>
+        <div id="currency-setup-message" style="margin-top:12px;color:#b00020;"></div>
+    </div>
+</div>
 
 </body>
 
