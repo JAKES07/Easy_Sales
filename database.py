@@ -32,6 +32,223 @@ def now_string():
     return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
+# ============================================================
+# STORE CURRENCY SETTINGS
+# ============================================================
+
+SUPPORTED_CURRENCIES = {
+    "AED": ("د.إ", "UAE Dirham"),
+    "AFN": ("؋", "Afghan Afghani"),
+    "ALL": ("L", "Albanian Lek"),
+    "AMD": ("֏", "Armenian Dram"),
+    "ANG": ("ƒ", "Netherlands Antillean Guilder"),
+    "AOA": ("Kz", "Angolan Kwanza"),
+    "ARS": ("$", "Argentine Peso"),
+    "AUD": ("$", "Australian Dollar"),
+    "AWG": ("ƒ", "Aruban Florin"),
+    "AZN": ("₼", "Azerbaijani Manat"),
+    "BAM": ("KM", "Bosnia and Herzegovina Convertible Mark"),
+    "BBD": ("$", "Barbadian Dollar"),
+    "BDT": ("৳", "Bangladeshi Taka"),
+    "BGN": ("лв", "Bulgarian Lev"),
+    "BHD": (".د.ب", "Bahraini Dinar"),
+    "BIF": ("FBu", "Burundian Franc"),
+    "BMD": ("$", "Bermudian Dollar"),
+    "BND": ("$", "Brunei Dollar"),
+    "BOB": ("Bs", "Bolivian Boliviano"),
+    "BRL": ("R$", "Brazilian Real"),
+    "BSD": ("$", "Bahamian Dollar"),
+    "BTN": ("Nu.", "Bhutanese Ngultrum"),
+    "BWP": ("P", "Botswana Pula"),
+    "BYN": ("Br", "Belarusian Ruble"),
+    "BZD": ("BZ$", "Belize Dollar"),
+    "CAD": ("$", "Canadian Dollar"),
+    "CDF": ("FC", "Congolese Franc"),
+    "CHF": ("CHF", "Swiss Franc"),
+    "CLP": ("$", "Chilean Peso"),
+    "CNY": ("¥", "Chinese Yuan"),
+    "COP": ("$", "Colombian Peso"),
+    "CRC": ("₡", "Costa Rican Colón"),
+    "CUP": ("₱", "Cuban Peso"),
+    "CVE": ("$", "Cape Verdean Escudo"),
+    "CZK": ("Kč", "Czech Koruna"),
+    "DJF": ("Fdj", "Djiboutian Franc"),
+    "DKK": ("kr", "Danish Krone"),
+    "DOP": ("RD$", "Dominican Peso"),
+    "DZD": ("دج", "Algerian Dinar"),
+    "EGP": ("E£", "Egyptian Pound"),
+    "ERN": ("Nfk", "Eritrean Nakfa"),
+    "ETB": ("Br", "Ethiopian Birr"),
+    "EUR": ("€", "Euro"),
+    "FJD": ("$", "Fijian Dollar"),
+    "FKP": ("£", "Falkland Islands Pound"),
+    "GBP": ("£", "British Pound"),
+    "GEL": ("₾", "Georgian Lari"),
+    "GHS": ("₵", "Ghanaian Cedi"),
+    "GIP": ("£", "Gibraltar Pound"),
+    "GMD": ("D", "Gambian Dalasi"),
+    "GNF": ("FG", "Guinean Franc"),
+    "GTQ": ("Q", "Guatemalan Quetzal"),
+    "GYD": ("$", "Guyanese Dollar"),
+    "HKD": ("$", "Hong Kong Dollar"),
+    "HNL": ("L", "Honduran Lempira"),
+    "HTG": ("G", "Haitian Gourde"),
+    "HUF": ("Ft", "Hungarian Forint"),
+    "IDR": ("Rp", "Indonesian Rupiah"),
+    "ILS": ("₪", "Israeli New Shekel"),
+    "INR": ("₹", "Indian Rupee"),
+    "IQD": ("ع.د", "Iraqi Dinar"),
+    "IRR": ("﷼", "Iranian Rial"),
+    "ISK": ("kr", "Icelandic Króna"),
+    "JMD": ("J$", "Jamaican Dollar"),
+    "JOD": ("د.ا", "Jordanian Dinar"),
+    "JPY": ("¥", "Japanese Yen"),
+    "KES": ("KSh", "Kenyan Shilling"),
+    "KGS": ("с", "Kyrgyzstani Som"),
+    "KHR": ("៛", "Cambodian Riel"),
+    "KMF": ("CF", "Comorian Franc"),
+    "KPW": ("₩", "North Korean Won"),
+    "KRW": ("₩", "South Korean Won"),
+    "KWD": ("د.ك", "Kuwaiti Dinar"),
+    "KYD": ("$", "Cayman Islands Dollar"),
+    "KZT": ("₸", "Kazakhstani Tenge"),
+    "LAK": ("₭", "Lao Kip"),
+    "LBP": ("ل.ل", "Lebanese Pound"),
+    "LKR": ("Rs", "Sri Lankan Rupee"),
+    "LRD": ("$", "Liberian Dollar"),
+    "LSL": ("L", "Lesotho Loti"),
+    "LYD": ("ل.د", "Libyan Dinar"),
+    "MAD": ("د.م.", "Moroccan Dirham"),
+    "MDL": ("L", "Moldovan Leu"),
+    "MGA": ("Ar", "Malagasy Ariary"),
+    "MKD": ("ден", "Macedonian Denar"),
+    "MMK": ("K", "Myanmar Kyat"),
+    "MNT": ("₮", "Mongolian Tögrög"),
+    "MOP": ("MOP$", "Macanese Pataca"),
+    "MRU": ("UM", "Mauritanian Ouguiya"),
+    "MUR": ("₨", "Mauritian Rupee"),
+    "MVR": ("Rf", "Maldivian Rufiyaa"),
+    "MWK": ("MK", "Malawian Kwacha"),
+    "MXN": ("$", "Mexican Peso"),
+    "MYR": ("RM", "Malaysian Ringgit"),
+    "MZN": ("MT", "Mozambican Metical"),
+    "NAD": ("$", "Namibian Dollar"),
+    "NGN": ("₦", "Nigerian Naira"),
+    "NIO": ("C$", "Nicaraguan Córdoba"),
+    "NOK": ("kr", "Norwegian Krone"),
+    "NPR": ("₨", "Nepalese Rupee"),
+    "NZD": ("$", "New Zealand Dollar"),
+    "OMR": ("ر.ع.", "Omani Rial"),
+    "PAB": ("B/.", "Panamanian Balboa"),
+    "PEN": ("S/", "Peruvian Sol"),
+    "PGK": ("K", "Papua New Guinean Kina"),
+    "PHP": ("₱", "Philippine Peso"),
+    "PKR": ("₨", "Pakistani Rupee"),
+    "PLN": ("zł", "Polish Złoty"),
+    "PYG": ("₲", "Paraguayan Guaraní"),
+    "QAR": ("ر.ق", "Qatari Riyal"),
+    "RON": ("lei", "Romanian Leu"),
+    "RSD": ("дин", "Serbian Dinar"),
+    "RUB": ("₽", "Russian Ruble"),
+    "RWF": ("FRw", "Rwandan Franc"),
+    "SAR": ("﷼", "Saudi Riyal"),
+    "SBD": ("$", "Solomon Islands Dollar"),
+    "SCR": ("₨", "Seychellois Rupee"),
+    "SDG": ("ج.س.", "Sudanese Pound"),
+    "SEK": ("kr", "Swedish Krona"),
+    "SGD": ("$", "Singapore Dollar"),
+    "SHP": ("£", "Saint Helena Pound"),
+    "SLE": ("Le", "Sierra Leonean Leone"),
+    "SOS": ("Sh", "Somali Shilling"),
+    "SRD": ("$", "Surinamese Dollar"),
+    "SSP": ("£", "South Sudanese Pound"),
+    "STN": ("Db", "São Tomé and Príncipe Dobra"),
+    "SVC": ("₡", "Salvadoran Colón"),
+    "SYP": ("£", "Syrian Pound"),
+    "SZL": ("E", "Eswatini Lilangeni"),
+    "THB": ("฿", "Thai Baht"),
+    "TJS": ("SM", "Tajikistani Somoni"),
+    "TMT": ("m", "Turkmenistani Manat"),
+    "TND": ("د.ت", "Tunisian Dinar"),
+    "TOP": ("T$", "Tongan Paʻanga"),
+    "TRY": ("₺", "Turkish Lira"),
+    "TTD": ("TT$", "Trinidad and Tobago Dollar"),
+    "TWD": ("NT$", "New Taiwan Dollar"),
+    "TZS": ("TSh", "Tanzanian Shilling"),
+    "UAH": ("₴", "Ukrainian Hryvnia"),
+    "UGX": ("USh", "Ugandan Shilling"),
+    "USD": ("$", "US Dollar"),
+    "UYU": ("$U", "Uruguayan Peso"),
+    "UZS": ("soʻm", "Uzbekistani Som"),
+    "VES": ("Bs.", "Venezuelan Bolívar"),
+    "VND": ("₫", "Vietnamese Đồng"),
+    "VUV": ("VT", "Vanuatu Vatu"),
+    "WST": ("T", "Samoan Tālā"),
+    "XAF": ("FCFA", "Central African CFA Franc"),
+    "XCD": ("$", "East Caribbean Dollar"),
+    "XOF": ("CFA", "West African CFA Franc"),
+    "XPF": ("₣", "CFP Franc"),
+    "YER": ("﷼", "Yemeni Rial"),
+    "ZAR": ("R", "South African Rand"),
+    "ZMW": ("ZK", "Zambian Kwacha"),
+    "ZWL": ("Z$", "Zimbabwean Dollar"),
+}
+
+
+def get_currency_settings():
+    connection = get_connection()
+    try:
+        row = connection.execute("""
+            SELECT currency_code, currency_symbol, currency_name, updated_at
+            FROM store_settings
+            WHERE id = 1
+        """).fetchone()
+        if not row or not row["currency_code"]:
+            return None
+        return dict(row)
+    finally:
+        connection.close()
+
+
+def set_currency_settings(currency_code):
+    currency_code = str(currency_code or "").strip().upper()
+    if currency_code not in SUPPORTED_CURRENCIES:
+        raise ValueError("Unsupported currency.")
+
+    symbol, name = SUPPORTED_CURRENCIES[currency_code]
+    connection = get_connection()
+    try:
+        existing = connection.execute("""
+            SELECT currency_code
+            FROM store_settings
+            WHERE id = 1
+        """).fetchone()
+        if existing and existing["currency_code"]:
+            raise ValueError("Store currency is already configured.")
+
+        connection.execute("""
+            INSERT INTO store_settings
+            (id, currency_code, currency_symbol, currency_name, updated_at)
+            VALUES (1, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                currency_code = excluded.currency_code,
+                currency_symbol = excluded.currency_symbol,
+                currency_name = excluded.currency_name,
+                updated_at = excluded.updated_at
+        """, (currency_code, symbol, name, now_string()))
+        connection.commit()
+        return {
+            "currency_code": currency_code,
+            "currency_symbol": symbol,
+            "currency_name": name
+        }
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
+
+
 def create_database():
     """Compatibility startup hook. Client databases are created per store."""
     return None
@@ -66,6 +283,29 @@ def add_product(name, price, stock, barcode=None):
         ))
 
         product_id = cursor.lastrowid
+
+        opening_stock = int(stock)
+        if opening_stock > 0:
+            created_at = now_string()
+            cursor.execute("""
+                INSERT INTO stock_movements
+                (product_id, product_name, movement_type,
+                 stock_before, quantity_added, quantity_sold,
+                 adjustment, stock_after, reason, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                product_id,
+                name,
+                "STOCK_IN",
+                0,
+                opening_stock,
+                0,
+                opening_stock,
+                opening_stock,
+                "Opening stock",
+                created_at
+            ))
+
         connection.commit()
         return product_id
 
@@ -83,12 +323,83 @@ def get_all_products():
     rows = connection.execute("""
         SELECT id, name, price, stock, barcode
         FROM products
+        WHERE active = 1
         ORDER BY name
     """).fetchall()
 
     connection.close()
 
     return [dict(row) for row in rows]
+
+
+# ============================================================
+# REMOVE PRODUCT TILE (KEEP PRODUCT HISTORY)
+# ============================================================
+
+def remove_product_tile(product_id):
+    """
+    Hide a product tile without deleting the product or any history.
+    A PRODUCT_REMOVED movement is written so the action is auditable.
+    """
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    try:
+        product = cursor.execute("""
+            SELECT id, name, price, stock, active
+            FROM products
+            WHERE id = ?
+        """, (product_id,)).fetchone()
+
+        if not product:
+            raise ValueError("Product not found.")
+
+        if int(product["active"]) == 0:
+            raise ValueError("Product tile is already removed.")
+
+        before = int(product["stock"])
+        created_at = now_string()
+
+        cursor.execute("""
+            UPDATE products
+            SET active = 0
+            WHERE id = ?
+        """, (product_id,))
+
+        cursor.execute("""
+            INSERT INTO stock_movements
+            (product_id, product_name, movement_type,
+             stock_before, quantity_added, quantity_sold,
+             adjustment, stock_after, reason, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            product_id,
+            product["name"],
+            "PRODUCT_REMOVED",
+            before,
+            0,
+            0,
+            0,
+            before,
+            "Product tile removed from POS (product history retained)",
+            created_at
+        ))
+
+        connection.commit()
+
+        return {
+            "id": product_id,
+            "name": product["name"],
+            "stock": before,
+            "removed_at": created_at
+        }
+
+    except Exception:
+        connection.rollback()
+        raise
+
+    finally:
+        connection.close()
 
 
 # ============================================================
@@ -488,6 +799,44 @@ def record_stocktake(product_id, counted_stock, notes):
     except Exception:
         connection.rollback()
         raise
+    finally:
+        connection.close()
+
+
+def get_stock_report_data():
+    """Return the full inventory audit data used by the PDF report."""
+    connection = get_connection()
+    try:
+        products = connection.execute("""
+            SELECT id, name, price, stock, barcode, active
+            FROM products
+            ORDER BY name
+        """).fetchall()
+
+        movements = connection.execute("""
+            SELECT *
+            FROM stock_movements
+            ORDER BY id ASC
+        """).fetchall()
+
+        stocktakes = connection.execute("""
+            SELECT *
+            FROM stock_takes
+            ORDER BY id ASC
+        """).fetchall()
+
+        monthly_reports = connection.execute("""
+            SELECT *
+            FROM monthly_reports
+            ORDER BY id ASC
+        """).fetchall()
+
+        return {
+            "products": [dict(row) for row in products],
+            "movements": [dict(row) for row in movements],
+            "stocktakes": [dict(row) for row in stocktakes],
+            "monthly_reports": [dict(row) for row in monthly_reports],
+        }
     finally:
         connection.close()
 
