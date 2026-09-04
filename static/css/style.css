@@ -2831,6 +2831,67 @@ button:active {
 
 }
 /* ============================================================
+   ADD PRODUCT BARCODE ENTRY
+   ============================================================ */
+
+.barcode-entry-row {
+
+    display: flex;
+    align-items: stretch;
+    gap: 10px;
+    width: 100%;
+
+}
+
+.barcode-entry-row input {
+
+    flex: 1;
+    min-width: 0;
+
+}
+
+.scan-product-barcode-button {
+
+    border: none;
+    border-radius: 10px;
+    padding: 0 16px;
+    background-color: #222222;
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+    white-space: nowrap;
+
+}
+
+.scan-product-barcode-button:active {
+
+    transform: scale(0.98);
+
+}
+
+#close-add-product-scanner {
+
+    width: 42px;
+    height: 42px;
+    border: none;
+    border-radius: 50%;
+    background-color: white;
+    color: #222222;
+    font-size: 28px;
+    cursor: pointer;
+
+}
+
+#add-product-scanner-video {
+
+    width: 100%;
+    display: block;
+    max-height: 65vh;
+    object-fit: cover;
+
+}
+
+/* ============================================================
    POS BARCODE SCANNER
    ============================================================ */
 
