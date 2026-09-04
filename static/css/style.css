@@ -3032,3 +3032,66 @@ button:active {
 .top-right-scanner:active {
     transform: scale(0.96);
 }
+
+
+/* ============================================================
+   PRODUCT TILE REMOVE BUTTON
+   ============================================================ */
+
+.remove-product-button {
+    padding: 9px 10px;
+    border: none;
+    border-radius: 8px;
+    background-color: #f2d6d6;
+    color: #8a1f1f;
+    font-size: 11px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.remove-product-button:active {
+    transform: scale(0.96);
+}
+
+/* ============================================================
+   STOCK PDF REPORT BUTTON
+   ============================================================ */
+
+.report-heading-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.stock-pdf-button {
+    border: none;
+    border-radius: 8px;
+    padding: 10px 12px;
+    background-color: #222222;
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: bold;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.stock-pdf-button:active {
+    transform: scale(0.97);
+}
+
+@media (max-width: 600px) {
+    .report-heading-row {
+        align-items: flex-start;
+    }
+
+    .stock-pdf-button {
+        font-size: 10px;
+        padding: 9px 8px;
+    }
+
+    .remove-product-button {
+        padding: 8px 7px;
+        font-size: 10px;
+    }
+}
