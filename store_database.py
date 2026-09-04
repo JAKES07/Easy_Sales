@@ -192,7 +192,8 @@ def create_store_database(store_id):
                 name TEXT NOT NULL,
                 price REAL NOT NULL,
                 stock INTEGER NOT NULL DEFAULT 0,
-                barcode TEXT UNIQUE
+                barcode TEXT UNIQUE,
+                active INTEGER NOT NULL DEFAULT 1
             )
         """)
 
@@ -270,6 +271,16 @@ def create_store_database(store_id):
         """)
 
         cursor.execute("""
+            CREATE TABLE IF NOT EXISTS store_settings (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                currency_code TEXT,
+                currency_symbol TEXT,
+                currency_name TEXT,
+                updated_at TEXT
+            )
+        """)
+
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS monthly_report_items (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 report_id INTEGER NOT NULL,
@@ -290,6 +301,13 @@ def create_store_database(store_id):
             "products",
             "barcode",
             "TEXT"
+        )
+
+        _ensure_column(
+            cursor,
+            "products",
+            "active",
+            "INTEGER NOT NULL DEFAULT 1"
         )
 
         _ensure_column(
