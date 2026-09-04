@@ -3,7 +3,8 @@
 # ============================================================
 
 import os
-from datetime import timedelta
+from io import BytesIO
+from datetime import timedelta, datetime
 
 from flask import (
     Flask,
@@ -17,11 +18,22 @@ from flask import (
 import sqlite3
 from werkzeug.middleware.proxy_fix import ProxyFix
 
+from reportlab.lib import colors
+from reportlab.lib.enums import TA_CENTER
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import mm
+from reportlab.platypus import (
+    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
+    PageBreak, KeepTogether
+)
+
 from database import (
     create_database,
     add_product,
     update_product,
     get_all_products,
+    remove_product_tile,
     get_product_by_barcode,
     complete_sale,
     get_stock_take,
@@ -34,7 +46,11 @@ from database import (
     create_monthly_report,
     get_monthly_reports,
     get_monthly_sales_summary,
-    get_connection
+    get_stock_report_data,
+    get_connection,
+    get_currency_settings,
+    set_currency_settings,
+    SUPPORTED_CURRENCIES
 )
 
 from store_controller import init_controller, get_store
@@ -333,7 +349,8 @@ def home():
     return render_template(
         "pos.html",
         store_id=session.get("store_id"),
-        store_name=session.get("store_name")
+        store_name=session.get("store_name"),
+        currency=get_currency_settings()
     )
 
 
@@ -354,7 +371,8 @@ def products():
         try:
             return jsonify({
                 "success": True,
-                "products": get_all_products()
+                "products": get_all_products(),
+                "currency": get_currency_settings()
             })
         except Exception as error:
             print("GET PRODUCTS ERROR:", error)
@@ -747,6 +765,84 @@ def save_sale():
             "message": (
                 "Could not complete sale."
             )
+        }), 500
+
+
+# ============================================================
+# STORE CURRENCY SETTINGS
+# ============================================================
+
+@app.route("/api/settings/currency", methods=["GET", "POST"])
+def currency_settings():
+    if request.method == "GET":
+        current = get_currency_settings()
+        return jsonify({
+            "success": True,
+            "configured": current is not None,
+            "currency": current,
+            "currencies": [
+                {
+                    "code": code,
+                    "symbol": values[0],
+                    "name": values[1]
+                }
+                for code, values in sorted(SUPPORTED_CURRENCIES.items())
+            ]
+        })
+
+    data = request.get_json(silent=True) or {}
+    currency_code = str(data.get("currency_code", "")).strip().upper()
+
+    try:
+        currency = set_currency_settings(currency_code)
+        return jsonify({
+            "success": True,
+            "message": "Store currency saved successfully.",
+            "currency": currency
+        })
+    except ValueError as error:
+        return jsonify({
+            "success": False,
+            "message": str(error)
+        }), 400
+    except Exception as error:
+        print("CURRENCY SETTINGS ERROR:", error)
+        return jsonify({
+            "success": False,
+            "message": "Could not save store currency."
+        }), 500
+
+
+# ============================================================
+# REMOVE PRODUCT TILE WITHOUT DELETING HISTORY
+# ============================================================
+
+@app.route(
+    "/api/products/<int:product_id>/remove",
+    methods=["POST"]
+)
+def remove_product(product_id):
+
+    try:
+        result = remove_product_tile(product_id)
+
+        return jsonify({
+            "success": True,
+            "message": "Product tile removed. Product history was retained.",
+            "product": result
+        })
+
+    except ValueError as error:
+        return jsonify({
+            "success": False,
+            "message": str(error)
+        }), 400
+
+    except Exception as error:
+        print("REMOVE PRODUCT ERROR:", error)
+        return jsonify({
+            "success": False,
+            "message": "Could not remove product tile."
         }), 500
 
 
@@ -1181,6 +1277,371 @@ def stocktake_history():
 
 
 # ============================================================
+# STOCK CONTROL PDF REPORT
+# ============================================================
+
+@app.route(
+    "/api/stock-report/pdf",
+    methods=["GET"]
+)
+def stock_report_pdf():
+
+    try:
+        report = get_stock_report_data()
+        currency = get_currency_settings() or {
+            "currency_code": "ZAR",
+            "currency_symbol": "R",
+            "currency_name": "South African Rand"
+        }
+
+        buffer = BytesIO()
+
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            "ReportTitle",
+            parent=styles["Title"],
+            alignment=TA_CENTER,
+            fontSize=18,
+            leading=22,
+            spaceAfter=6
+        )
+        section_style = ParagraphStyle(
+            "Section",
+            parent=styles["Heading2"],
+            fontSize=13,
+            leading=16,
+            spaceBefore=10,
+            spaceAfter=7
+        )
+        small_style = ParagraphStyle(
+            "Small",
+            parent=styles["BodyText"],
+            fontSize=7.5,
+            leading=9
+        )
+
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=A4,
+            rightMargin=10 * mm,
+            leftMargin=10 * mm,
+            topMargin=25 * mm,
+            bottomMargin=15 * mm,
+            title="Easy Sales Stock Control Report"
+        )
+
+        logo_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "static",
+            "images",
+            "logo.png"
+        )
+
+        generated_date = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+
+        def draw_page_header(canvas, document):
+            canvas.saveState()
+            page_width, page_height = A4
+
+            if os.path.isfile(logo_path):
+                try:
+                    canvas.drawImage(
+                        logo_path,
+                        10 * mm,
+                        page_height - 20 * mm,
+                        width=28 * mm,
+                        height=12 * mm,
+                        preserveAspectRatio=True,
+                        mask="auto"
+                    )
+                except Exception:
+                    pass
+
+            canvas.setFont("Helvetica", 8)
+            canvas.drawRightString(
+                page_width - 10 * mm,
+                page_height - 14 * mm,
+                f"Date: {generated_date}"
+            )
+
+            canvas.setStrokeColor(colors.grey)
+            canvas.line(
+                10 * mm,
+                page_height - 22 * mm,
+                page_width - 10 * mm,
+                page_height - 22 * mm
+            )
+
+            canvas.setFont("Helvetica", 7)
+            canvas.drawCentredString(
+                page_width / 2,
+                7 * mm,
+                f"Easy Sales • Stock Control Report • Page {document.page}"
+            )
+            canvas.restoreState()
+
+        story = [
+            Paragraph(
+                f"EASY SALES STOCK CONTROL REPORT — {currency['currency_code']}",
+                title_style
+            ),
+            Paragraph(
+                "Complete inventory audit: current stock, stock movement, stock added, "
+                "and stock reconciliation.",
+                styles["BodyText"]
+            ),
+            Spacer(1, 5 * mm)
+        ]
+
+        # --------------------------------------------------------
+        # 1. CURRENT STOCK
+        # --------------------------------------------------------
+        story.append(Paragraph("1. Current Stock", section_style))
+
+        product_rows = [["Product", "Price", "Stock", "Status", "Barcode"]]
+        total_units = 0
+        total_value = 0.0
+
+        for p in report["products"]:
+            stock = int(p.get("stock", 0) or 0)
+            price = float(p.get("price", 0) or 0)
+            total_units += stock
+            total_value += stock * price
+            status = "ACTIVE" if int(p.get("active", 1) or 0) else "REMOVED"
+            product_rows.append([
+                p.get("name", ""),
+                f"{currency['currency_code']} {price:,.2f}",
+                str(stock),
+                status,
+                p.get("barcode") or "-"
+            ])
+
+        product_rows.append([
+            "TOTAL",
+            "",
+            str(total_units),
+            "",
+            f"Value: {currency['currency_code']} {total_value:,.2f}"
+        ])
+
+        t = Table(product_rows, colWidths=[60*mm, 25*mm, 18*mm, 23*mm, 48*mm], repeatRows=1)
+        t.setStyle(TableStyle([
+            ("BACKGROUND", (0,0), (-1,0), colors.HexColor("#333333")),
+            ("TEXTCOLOR", (0,0), (-1,0), colors.white),
+            ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
+            ("FONTSIZE", (0,0), (-1,-1), 7.5),
+            ("GRID", (0,0), (-1,-1), 0.35, colors.grey),
+            ("ALIGN", (1,1), (3,-1), "RIGHT"),
+            ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
+            ("BACKGROUND", (0,-1), (-1,-1), colors.lightgrey),
+            ("FONTNAME", (0,-1), (-1,-1), "Helvetica-Bold"),
+            ("TOPPADDING", (0,0), (-1,-1), 4),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 4),
+        ]))
+        story.append(t)
+
+        # --------------------------------------------------------
+        # 2. STOCK MOVEMENT
+        # --------------------------------------------------------
+        story.append(Paragraph("2. Stock Movement History", section_style))
+        movement_rows = [[
+            "Date", "Product", "Type", "Before", "Added",
+            "Sold", "Adj.", "After", "Reason"
+        ]]
+
+        for m in report["movements"]:
+            movement_rows.append([
+                str(m.get("created_at", "")),
+                str(m.get("product_name", "")),
+                str(m.get("movement_type", "")),
+                str(m.get("stock_before", 0)),
+                str(m.get("quantity_added", 0)),
+                str(m.get("quantity_sold", 0)),
+                str(m.get("adjustment", 0)),
+                str(m.get("stock_after", 0)),
+                str(m.get("reason") or "")
+            ])
+
+        if len(movement_rows) == 1:
+            movement_rows.append(["-", "No movements recorded", "-", "-", "-", "-", "-", "-", "-"])
+
+        t = Table(
+            movement_rows,
+            colWidths=[27*mm, 35*mm, 28*mm, 15*mm, 15*mm, 15*mm, 13*mm, 15*mm, 32*mm],
+            repeatRows=1
+        )
+        t.setStyle(TableStyle([
+            ("BACKGROUND", (0,0), (-1,0), colors.HexColor("#333333")),
+            ("TEXTCOLOR", (0,0), (-1,0), colors.white),
+            ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
+            ("FONTSIZE", (0,0), (-1,-1), 6.5),
+            ("GRID", (0,0), (-1,-1), 0.3, colors.grey),
+            ("VALIGN", (0,0), (-1,-1), "TOP"),
+            ("TOPPADDING", (0,0), (-1,-1), 3),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 3),
+        ]))
+        story.append(t)
+
+        # --------------------------------------------------------
+        # 3. STOCK ADDED
+        # --------------------------------------------------------
+        story.append(Paragraph("3. Stock Added / Received", section_style))
+        added = [
+            m for m in report["movements"]
+            if str(m.get("movement_type", "")).upper() == "STOCK_IN"
+        ]
+
+        added_rows = [["Date", "Product", "Before", "Quantity Added", "After", "Reason"]]
+        for m in added:
+            added_rows.append([
+                str(m.get("created_at", "")),
+                str(m.get("product_name", "")),
+                str(m.get("stock_before", 0)),
+                str(m.get("quantity_added", 0)),
+                str(m.get("stock_after", 0)),
+                str(m.get("reason") or "")
+            ])
+        if len(added_rows) == 1:
+            added_rows.append(["-", "No stock received records", "-", "-", "-", "-"])
+
+        t = Table(
+            added_rows,
+            colWidths=[30*mm, 48*mm, 22*mm, 30*mm, 22*mm, 35*mm],
+            repeatRows=1
+        )
+        t.setStyle(TableStyle([
+            ("BACKGROUND", (0,0), (-1,0), colors.HexColor("#333333")),
+            ("TEXTCOLOR", (0,0), (-1,0), colors.white),
+            ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
+            ("FONTSIZE", (0,0), (-1,-1), 7),
+            ("GRID", (0,0), (-1,-1), 0.3, colors.grey),
+            ("VALIGN", (0,0), (-1,-1), "TOP"),
+            ("TOPPADDING", (0,0), (-1,-1), 3),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 3),
+        ]))
+        story.append(t)
+
+        # --------------------------------------------------------
+        # 4. STOCK RECONCILIATION
+        # --------------------------------------------------------
+        story.append(Paragraph("4. Stock Reconciliation Report", section_style))
+        reconciliation_rows = [[
+            "Date", "Product", "System Stock", "Counted Stock",
+            "Variance", "Final Stock", "Notes"
+        ]]
+
+        for r in report["stocktakes"]:
+            reconciliation_rows.append([
+                str(r.get("taken_at", "")),
+                str(r.get("product_name", "")),
+                str(r.get("system_stock", 0)),
+                str(r.get("counted_stock", 0)),
+                str(r.get("variance", 0)),
+                str(r.get("counted_stock", 0)),
+                str(r.get("notes") or "")
+            ])
+
+        if len(reconciliation_rows) == 1:
+            reconciliation_rows.append([
+                "-", "No physical stock reconciliations recorded",
+                "-", "-", "-", "-", "-"
+            ])
+
+        t = Table(
+            reconciliation_rows,
+            colWidths=[27*mm, 40*mm, 27*mm, 27*mm, 20*mm, 22*mm, 30*mm],
+            repeatRows=1
+        )
+        t.setStyle(TableStyle([
+            ("BACKGROUND", (0,0), (-1,0), colors.HexColor("#333333")),
+            ("TEXTCOLOR", (0,0), (-1,0), colors.white),
+            ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
+            ("FONTSIZE", (0,0), (-1,-1), 6.8),
+            ("GRID", (0,0), (-1,-1), 0.3, colors.grey),
+            ("VALIGN", (0,0), (-1,-1), "TOP"),
+            ("TOPPADDING", (0,0), (-1,-1), 3),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 3),
+        ]))
+        story.append(t)
+
+        # --------------------------------------------------------
+        # 5. MONTHLY RECONCILIATION SUMMARY
+        # --------------------------------------------------------
+        story.append(Paragraph("5. Saved Reconciliation Summaries", section_style))
+        monthly_rows = [[
+            "Month", "Cash Expected", "Cash Actual", "Cash Variance",
+            "Stock Units", "Stock Value", "Damaged", "Total Loss"
+        ]]
+
+        for r in report["monthly_reports"]:
+            monthly_rows.append([
+                str(r.get("report_month", "")),
+                f"{currency['currency_code']} {float(r.get('expected_cash',0) or 0):,.2f}",
+                f"{currency['currency_code']} {float(r.get('cash_at_hand',0) or 0):,.2f}",
+                f"{currency['currency_code']} {float(r.get('cash_variance',0) or 0):,.2f}",
+                str(r.get("stock_units", 0)),
+                f"{currency['currency_code']} {float(r.get('stock_value',0) or 0):,.2f}",
+                str(r.get("damaged_units", 0)),
+                f"{currency['currency_code']} {float(r.get('total_loss',0) or 0):,.2f}"
+            ])
+
+        if len(monthly_rows) == 1:
+            monthly_rows.append(["-", "-", "-", "-", "-", "-", "-", "-"])
+
+        t = Table(
+            monthly_rows,
+            colWidths=[22*mm, 27*mm, 27*mm, 25*mm, 20*mm, 28*mm, 18*mm, 25*mm],
+            repeatRows=1
+        )
+        t.setStyle(TableStyle([
+            ("BACKGROUND", (0,0), (-1,0), colors.HexColor("#333333")),
+            ("TEXTCOLOR", (0,0), (-1,0), colors.white),
+            ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
+            ("FONTSIZE", (0,0), (-1,-1), 6.8),
+            ("GRID", (0,0), (-1,-1), 0.3, colors.grey),
+            ("VALIGN", (0,0), (-1,-1), "TOP"),
+            ("TOPPADDING", (0,0), (-1,-1), 3),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 3),
+        ]))
+        story.append(t)
+
+        story.append(Spacer(1, 5 * mm))
+        story.append(Paragraph(
+            "Report note: Removed product tiles are retained in the database and "
+            "their removal is recorded as PRODUCT_REMOVED in the stock movement history.",
+            small_style
+        ))
+
+        doc.build(
+            story,
+            onFirstPage=draw_page_header,
+            onLaterPages=draw_page_header
+        )
+
+        buffer.seek(0)
+
+        filename = (
+            "Easy_Sales_Stock_Control_Report_"
+            + datetime.now().strftime("%Y-%m-%d")
+            + ".pdf"
+        )
+
+        return send_file(
+            buffer,
+            mimetype="application/pdf",
+            as_attachment=True,
+            download_name=filename
+        )
+
+    except Exception as error:
+        print("STOCK PDF REPORT ERROR:", error)
+        return jsonify({
+            "success": False,
+            "message": "Could not generate stock control PDF."
+        }), 500
+
+
+# ============================================================
 # MONTHLY STOCK / CASH REPORTS
 # ============================================================
 
@@ -1394,7 +1855,8 @@ def session_status():
         "success": True,
         "active": True,
         "store_id": store["store_id"],
-        "store_name": store["store_name"]
+        "store_name": store["store_name"],
+        "currency": get_currency_settings()
     })
 
 
