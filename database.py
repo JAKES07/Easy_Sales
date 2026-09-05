@@ -333,6 +333,90 @@ def get_all_products():
 
 
 # ============================================================
+# UNDO PRODUCT TILE REMOVAL
+# ============================================================
+
+def undo_product_tile_removal(movement_id):
+    """
+    Restore a product that was hidden by a PRODUCT_REMOVED movement.
+    The original product row (including its barcode, stock and history) is
+    preserved. A PRODUCT_RESTORED movement is added for a complete audit trail.
+    """
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    try:
+        movement = cursor.execute("""
+            SELECT id, product_id, product_name, movement_type, stock_after
+            FROM stock_movements
+            WHERE id = ?
+        """, (movement_id,)).fetchone()
+
+        if not movement:
+            raise ValueError("Removal movement not found.")
+
+        if str(movement["movement_type"]).upper() != "PRODUCT_REMOVED":
+            raise ValueError("Only a product removal can be undone.")
+
+        product = cursor.execute("""
+            SELECT id, name, price, stock, barcode, active
+            FROM products
+            WHERE id = ?
+        """, (movement["product_id"],)).fetchone()
+
+        if not product:
+            raise ValueError("Product not found.")
+
+        if int(product["active"]) == 1:
+            raise ValueError("Product tile is already active.")
+
+        before = int(product["stock"])
+        created_at = now_string()
+
+        cursor.execute("""
+            UPDATE products
+            SET active = 1
+            WHERE id = ?
+        """, (product["id"],))
+
+        cursor.execute("""
+            INSERT INTO stock_movements
+            (product_id, product_name, movement_type,
+             stock_before, quantity_added, quantity_sold,
+             adjustment, stock_after, reason, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            product["id"],
+            product["name"],
+            "PRODUCT_RESTORED",
+            before,
+            0,
+            0,
+            0,
+            before,
+            "Product tile restored using Undo (original barcode and history retained)",
+            created_at
+        ))
+
+        connection.commit()
+
+        return {
+            "id": int(product["id"]),
+            "name": product["name"],
+            "stock": before,
+            "barcode": product["barcode"],
+            "restored_at": created_at
+        }
+
+    except Exception:
+        connection.rollback()
+        raise
+
+    finally:
+        connection.close()
+
+
+# ============================================================
 # REMOVE PRODUCT TILE (KEEP PRODUCT HISTORY)
 # ============================================================
 
