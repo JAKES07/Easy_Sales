@@ -35,6 +35,7 @@ from database import (
     update_product,
     get_all_products,
     remove_product_tile,
+    undo_product_tile_removal,
     get_product_by_barcode,
     complete_sale,
     get_stock_take,
@@ -1166,6 +1167,39 @@ def record_physical_stocktake():
             "message": (
                 "Could not record stocktake."
             )
+        }), 500
+
+
+# ============================================================
+# UNDO PRODUCT TILE REMOVAL
+# ============================================================
+
+@app.route(
+    "/api/stock-movements/<int:movement_id>/undo",
+    methods=["POST"]
+)
+def undo_stock_movement(movement_id):
+
+    try:
+        result = undo_product_tile_removal(movement_id)
+
+        return jsonify({
+            "success": True,
+            "message": "Product tile restored successfully. Its original barcode and history were retained.",
+            "product": result
+        })
+
+    except ValueError as error:
+        return jsonify({
+            "success": False,
+            "message": str(error)
+        }), 400
+
+    except Exception as error:
+        print("UNDO PRODUCT REMOVAL ERROR:", error)
+        return jsonify({
+            "success": False,
+            "message": "Could not restore product tile."
         }), 500
 
 
