@@ -2481,6 +2481,25 @@ async function showMovementHistory() {
         content.innerHTML =
             html;
 
+        // Bind Undo buttons after the movement-history HTML is inserted.
+        // These buttons are created dynamically, so listeners must be attached
+        // after content.innerHTML is updated.
+        content.querySelectorAll(
+            ".undo-product-button"
+        ).forEach(function(button) {
+
+            button.addEventListener(
+                "click",
+                function() {
+                    undoProductRemoval(
+                        button.dataset.movementId,
+                        button.dataset.productName
+                    );
+                }
+            );
+
+        });
+
 
     } catch (error) {
 
