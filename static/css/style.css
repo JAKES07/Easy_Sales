@@ -3156,3 +3156,47 @@ button:active {
         font-size: 10px;
     }
 }
+
+/* ============================================================
+   PRODUCT REMOVAL UNDO
+   ============================================================ */
+
+.undo-product-button {
+
+    display: block;
+
+    width: 100%;
+
+    margin-top: 12px;
+
+    padding: 10px 12px;
+
+    border: none;
+
+    border-radius: 8px;
+
+    background-color: #1f8f4d;
+
+    color: #ffffff;
+
+    font-size: 12px;
+
+    font-weight: bold;
+
+    cursor: pointer;
+
+}
+
+
+.undo-product-button:active {
+
+    transform: scale(0.98);
+
+}
+
+
+.history-undo-button {
+
+    margin-top: 10px;
+
+}
