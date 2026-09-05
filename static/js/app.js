@@ -2134,6 +2134,22 @@ async function showCurrentStockReport() {
         content.innerHTML =
             html;
 
+        content.querySelectorAll(
+            ".undo-product-button"
+        ).forEach(function(button) {
+
+            button.addEventListener(
+                "click",
+                function() {
+                    undoProductRemoval(
+                        button.dataset.movementId,
+                        button.dataset.productName
+                    );
+                }
+            );
+
+        });
+
 
     } catch (error) {
 
@@ -2436,6 +2452,21 @@ async function showMovementHistory() {
                                 </p>
 
                             </div>
+
+                            ${
+                                String(movement.movement_type || "").toUpperCase() === "PRODUCT_REMOVED"
+                                ? `
+                                    <button
+                                        class="undo-product-button"
+                                        type="button"
+                                        data-movement-id="${movement.id}"
+                                        data-product-name="${escapeHtml(movement.product_name || "Product")}"
+                                    >
+                                        ↩ UNDO REMOVAL
+                                    </button>
+                                  `
+                                : ""
+                            }
 
                         </div>
 
@@ -3961,6 +3992,78 @@ async function savePhysicalStocktake(
 
 
 // ============================================================
+// UNDO PRODUCT TILE REMOVAL
+// ============================================================
+
+async function undoProductRemoval(
+    movementId,
+    productName
+) {
+
+    if (!movementId) {
+        return;
+    }
+
+    const confirmed = window.confirm(
+        "Restore this product tile?\n\n" +
+        (productName || "Product") +
+        "\n\nThe original barcode, stock and product history will be kept."
+    );
+
+    if (!confirmed) {
+        return;
+    }
+
+    try {
+
+        const response = await fetch(
+            "/api/stock-movements/" +
+            encodeURIComponent(movementId) +
+            "/undo",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({})
+            }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+            showMessage(
+                data.message ||
+                "Could not restore product tile."
+            );
+            return;
+        }
+
+        await loadProducts();
+        await showMovementHistory();
+
+        showMessage(
+            (productName || "Product") +
+            " restored. The original barcode is active again."
+        );
+
+    } catch (error) {
+
+        console.error(
+            "UNDO PRODUCT REMOVAL ERROR:",
+            error
+        );
+
+        showMessage(
+            "Could not restore product tile."
+        );
+
+    }
+
+}
+
+
+// ============================================================
 // 23. MOVEMENT HISTORY
 // ============================================================
 
@@ -4099,10 +4202,41 @@ async function toggleMovementHistory(
                         )}
                     </span>
 
+                    ${
+                        String(movement.movement_type || "").toUpperCase() === "PRODUCT_REMOVED"
+                        ? `
+                            <button
+                                class="undo-product-button history-undo-button"
+                                type="button"
+                                data-movement-id="${movement.id}"
+                                data-product-name="${escapeHtml(movement.product_name || "Product")}"
+                            >
+                                ↩ UNDO REMOVAL
+                            </button>
+                          `
+                        : ""
+                    }
+
                 `;
 
 
                 panel.appendChild(entry);
+
+                const undoButton = entry.querySelector(
+                    ".undo-product-button"
+                );
+
+                if (undoButton) {
+                    undoButton.addEventListener(
+                        "click",
+                        function() {
+                            undoProductRemoval(
+                                undoButton.dataset.movementId,
+                                undoButton.dataset.productName
+                            );
+                        }
+                    );
+                }
 
             }
         );
