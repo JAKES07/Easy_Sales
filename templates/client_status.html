@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Easy Sales - Client Status</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#222}
+.header{background:#20252b;color:#fff;padding:22px}
+.container{max-width:1150px;margin:auto;padding:20px}
+.topbar{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:20px}
+.card{background:#fff;border-radius:14px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:850px}
+th,td{text-align:left;padding:13px 12px;border-bottom:1px solid #eee;vertical-align:top}
+th{background:#f8fafc;font-size:13px;text-transform:uppercase;color:#6b7280}
+.badge{display:inline-block;padding:6px 10px;border-radius:999px;font-size:12px;font-weight:bold}
+.active{background:#d1fae5;color:#065f46}.inactive{background:#fee2e2;color:#991b1b}.expired{background:#ffedd5;color:#9a3412}.available{background:#e0e7ff;color:#3730a3}
+.days{font-weight:bold}.danger{color:#b42318}.good{color:#16803c}
+a{display:inline-block;text-decoration:none;background:#20252b;color:#fff;padding:10px 14px;border-radius:8px;font-weight:bold}
+@media(max-width:600px){.container{padding:12px}.header{padding:18px}.card{padding:14px}}
+</style>
+</head>
+<body>
+<div class="header"><h1>📋 Easy Sales Client Status</h1><p>Track activation, expiry and access status for every client store.</p></div>
+<div class="container">
+<div class="topbar"><div><strong>Subscription Overview</strong><div style="color:#6b7280;font-size:13px;margin-top:4px;">Activation period: 30 days</div></div><a href="{{ url_for('controller.dashboard') }}">← Dashboard</a></div>
+<div class="card table-wrap">
+<table>
+<thead><tr><th>Client / Store</th><th>Store ID</th><th>Status</th><th>Activated</th><th>Expires</th><th>Days Remaining</th><th>Action</th></tr></thead>
+<tbody>
+{% for item in clients %}
+{% set store=item.store %}
+<tr>
+<td><strong>{{ store["store_name"] }}</strong><br><span style="color:#777;font-size:12px;">{{ store["notes"] or "No notes" }}</span></td>
+<td><code>{{ store["store_id"] }}</code></td>
+<td>
+{% if store["status"] == "ACTIVE" %}<span class="badge active">● ACTIVE</span>
+{% elif store["status"] == "EXPIRED" %}<span class="badge expired">● EXPIRED</span>
+{% elif store["status"] == "AVAILABLE" %}<span class="badge available">● AVAILABLE</span>
+{% else %}<span class="badge inactive">● {{ store["status"] }}</span>{% endif %}
+</td>
+<td>{{ store["activated_at"] or "—" }}</td>
+<td>{{ store["expires_at"] or "—" }}</td>
+<td class="days {% if item.days_remaining is not none and item.days_remaining <= 3 %}danger{% elif item.days_remaining is not none %}good{% endif %}">{% if item.days_remaining is none %}—{% elif store["status"] == "ACTIVE" %}{{ item.days_remaining }} day{{ '' if item.days_remaining == 1 else 's' }}{% else %}0{% endif %}</td>
+<td><a href="{{ url_for('controller.store_details', store_id=store['store_id']) }}">View</a></td>
+</tr>
+{% else %}
+<tr><td colspan="7" style="text-align:center;color:#777;padding:30px;">No client stores found.</td></tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+</div>
+</body>
+</html>
