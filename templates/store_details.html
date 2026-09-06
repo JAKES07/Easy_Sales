@@ -103,8 +103,14 @@
         </div>
 
         <div class="row">
-            <div class="label">CURRENT PASSKEY</div>
-            <div class="value">{{ store["passkey"] }}</div>
+            <div class="label">SUBSCRIPTION STATUS</div>
+            {% if store["status"] == "ACTIVE" %}
+                <div class="value active">● ACTIVE</div>
+            {% elif store["status"] == "EXPIRED" %}
+                <div class="value inactive">● EXPIRED</div>
+            {% else %}
+                <div class="value inactive">● {{ store["status"] }}</div>
+            {% endif %}
         </div>
 
         <div class="row">
@@ -116,6 +122,13 @@
             <div class="label">ACTIVATED</div>
             <div class="value">
                 {{ store["activated_at"] or "Not activated yet" }}
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="label">SUBSCRIPTION EXPIRES</div>
+            <div class="value">
+                {{ store["expires_at"] or "Not set" }}
             </div>
         </div>
 
