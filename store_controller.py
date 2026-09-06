@@ -22,7 +22,7 @@
 import os
 import sqlite3
 import secrets
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from werkzeug.security import (
@@ -94,6 +94,19 @@ def now():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
+def _ensure_column(cursor, table_name, column_name, definition):
+    """Add a controller column when upgrading an older database."""
+    columns = {
+        row[1] for row in cursor.execute(
+            f"PRAGMA table_info({table_name})"
+        ).fetchall()
+    }
+    if column_name not in columns:
+        cursor.execute(
+            f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}"
+        )
+
+
 # ============================================================
 # STORE ID / PASSKEY GENERATION
 # ============================================================
@@ -145,6 +158,7 @@ def init_controller():
             passkey TEXT NOT NULL,
             created_at TEXT NOT NULL,
             activated_at TEXT,
+            expires_at TEXT,
             deactivated_at TEXT,
             notes TEXT
         )
@@ -159,6 +173,29 @@ def init_controller():
             created_at TEXT NOT NULL
         )
     """)
+
+    # Subscription fields are added safely to older controller databases.
+    _ensure_column(cur, "stores", "expires_at", "TEXT")
+
+    # Existing ACTIVE stores from older versions did not have a subscription
+    # expiry. Give them a fresh 30-day period rather than locking them out
+    # immediately during the upgrade.
+    existing_active = cur.execute("""
+        SELECT store_id
+        FROM stores
+        WHERE status = 'ACTIVE'
+          AND (expires_at IS NULL OR expires_at = '')
+    """).fetchall()
+
+    migration_expiry = (datetime.now() + timedelta(days=30)).strftime(
+        "%Y-%m-%d %H:%M:%S"
+    )
+
+    for row in existing_active:
+        cur.execute(
+            "UPDATE stores SET expires_at=? WHERE store_id=?",
+            (migration_expiry, row["store_id"])
+        )
 
     existing_count = cur.execute(
         "SELECT COUNT(*) FROM stores"
@@ -263,27 +300,80 @@ def create_store(store_name, notes=""):
 # STORE LOOKUPS
 # ============================================================
 
+def _expire_store_if_needed(store_id, conn=None):
+    """Mark an ACTIVE store expired when its 30-day period has ended."""
+
+    close_conn = False
+    if conn is None:
+        conn = get_connection()
+        close_conn = True
+
+    try:
+        row = conn.execute(
+            "SELECT status, expires_at FROM stores WHERE store_id=?",
+            (str(store_id).strip().upper(),)
+        ).fetchone()
+
+        if (
+            row
+            and row["status"] == "ACTIVE"
+            and row["expires_at"]
+        ):
+            try:
+                expiry = datetime.strptime(
+                    row["expires_at"],
+                    "%Y-%m-%d %H:%M:%S"
+                )
+            except ValueError:
+                expiry = None
+
+            if expiry and datetime.now() >= expiry:
+                conn.execute(
+                    """
+                    UPDATE stores
+                    SET status='EXPIRED', deactivated_at=?
+                    WHERE store_id=? AND status='ACTIVE'
+                    """,
+                    (now(), str(store_id).strip().upper())
+                )
+                conn.execute(
+                    """
+                    INSERT INTO store_activity
+                    (store_id, action, description, created_at)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    (
+                        str(store_id).strip().upper(),
+                        "EXPIRED",
+                        "30-day activation period expired automatically",
+                        now()
+                    )
+                )
+                conn.commit()
+                return True
+
+        return False
+    finally:
+        if close_conn:
+            conn.close()
+
+
 def get_store(store_id):
 
     conn = get_connection()
 
     try:
-
+        store_id = str(store_id).strip().upper()
+        _expire_store_if_needed(store_id, conn)
         return conn.execute(
             """
             SELECT *
             FROM stores
             WHERE store_id = ?
             """,
-            (
-                str(store_id)
-                .strip()
-                .upper(),
-            )
+            (store_id,)
         ).fetchone()
-
     finally:
-
         conn.close()
 
 
@@ -292,13 +382,57 @@ def get_all_stores():
     conn = get_connection()
 
     try:
+        # Automatically update expired clients before displaying the list.
+        active_rows = conn.execute(
+            """
+            SELECT store_id, expires_at
+            FROM stores
+            WHERE status='ACTIVE'
+              AND expires_at IS NOT NULL
+              AND expires_at != ''
+            """
+        ).fetchall()
+
+        current_time = datetime.now()
+        for row in active_rows:
+            try:
+                expiry = datetime.strptime(
+                    row["expires_at"],
+                    "%Y-%m-%d %H:%M:%S"
+                )
+            except ValueError:
+                continue
+
+            if current_time >= expiry:
+                store_id = row["store_id"]
+                conn.execute(
+                    """
+                    UPDATE stores
+                    SET status='EXPIRED', deactivated_at=?
+                    WHERE store_id=? AND status='ACTIVE'
+                    """,
+                    (now(), store_id)
+                )
+                conn.execute(
+                    """
+                    INSERT INTO store_activity
+                    (store_id, action, description, created_at)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    (
+                        store_id,
+                        "EXPIRED",
+                        "30-day activation period expired automatically",
+                        now()
+                    )
+                )
+
+        conn.commit()
 
         return conn.execute(
             "SELECT * FROM stores ORDER BY id ASC"
         ).fetchall()
-
     finally:
-
         conn.close()
 
 
@@ -335,6 +469,14 @@ def get_store_counts():
                 FROM stores
                 WHERE status='AVAILABLE'
                 """
+            ).fetchone()[0],
+
+            "expired": conn.execute(
+                """
+                SELECT COUNT(*)
+                FROM stores
+                WHERE status='EXPIRED'
+                """
             ).fetchone()[0]
         }
 
@@ -349,13 +491,16 @@ def get_store_counts():
 
 def activate_store(store_id):
 
-    store_id = str(
-        store_id
-    ).strip().upper()
+    store_id = str(store_id).strip().upper()
 
     # Create the private database if this store does not have one.
     # Existing store data is preserved.
     create_store_database(store_id)
+
+    activated_at = datetime.now()
+    expires_at = activated_at + timedelta(days=30)
+    activated_text = activated_at.strftime("%Y-%m-%d %H:%M:%S")
+    expires_text = expires_at.strftime("%Y-%m-%d %H:%M:%S")
 
     conn = get_connection()
     cur = conn.cursor()
@@ -364,20 +509,18 @@ def activate_store(store_id):
         UPDATE stores
         SET status='ACTIVE',
             activated_at=?,
+            expires_at=?,
             deactivated_at=NULL
         WHERE store_id=?
     """, (
-        now(),
+        activated_text,
+        expires_text,
         store_id
     ))
 
     if cur.rowcount == 0:
-
         conn.close()
-
-        raise ValueError(
-            "Store not found."
-        )
+        raise ValueError("Store not found.")
 
     cur.execute("""
         INSERT INTO store_activity
@@ -386,12 +529,28 @@ def activate_store(store_id):
     """, (
         store_id,
         "ACTIVATED",
-        "Store manually activated",
+        f"Store activated for 30 days. Expires {expires_text}",
         now()
     ))
 
     conn.commit()
     conn.close()
+
+    return {
+        "store_id": store_id,
+        "activated_at": activated_text,
+        "expires_at": expires_text,
+        "days": 30
+    }
+
+
+# ============================================================
+# RENEW STORE FOR ANOTHER 30 DAYS
+# ============================================================
+
+def renew_store(store_id):
+    """Start a fresh 30-day subscription period from the renewal time."""
+    return activate_store(store_id)
 
 
 # ============================================================
@@ -566,8 +725,24 @@ def check_access(store_id, passkey):
 
         return False, "STORE_AVAILABLE"
 
-    if store["status"] != "ACTIVE":
+    if store["status"] == "ACTIVE" and store["expires_at"]:
+        try:
+            expiry = datetime.strptime(
+                store["expires_at"],
+                "%Y-%m-%d %H:%M:%S"
+            )
+        except ValueError:
+            expiry = None
 
+        if expiry and datetime.now() >= expiry:
+            # get_store normally handles this already, but keep this guard
+            # here as a second server-side protection.
+            _expire_store_if_needed(store_id)
+            return False, "STORE_EXPIRED"
+
+    if store["status"] != "ACTIVE":
+        if store["status"] == "EXPIRED":
+            return False, "STORE_EXPIRED"
         return False, "STORE_INACTIVE"
 
     return True, "ACCESS_GRANTED"
