@@ -256,7 +256,7 @@ function displayProducts(products) {
                 type="button"
                 title="Remove product tile"
                 aria-label="Remove ${escapeHtml(product.name)}">
-                <span aria-hidden="true">⌫</span>
+                <span aria-hidden="true">🗑</span>
             </button>
 
             <button
@@ -264,7 +264,7 @@ function displayProducts(products) {
                 type="button"
                 title="Add to cart"
                 aria-label="Add ${escapeHtml(product.name)} to cart">
-                <span aria-hidden="true">+</span>
+                <span aria-hidden="true">＋</span>
             </button>
         `;
 
