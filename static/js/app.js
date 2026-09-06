@@ -244,27 +244,28 @@ function displayProducts(products) {
             </div>
 
             <button
-                class="tile-icon-button edit-product-button"
-                type="button"
-                title="Edit product"
-                aria-label="Edit ${escapeHtml(product.name)}">
-                <span aria-hidden="true">✎</span>
+                class="edit-product-button"
+                type="button">
+
+                EDIT
+
             </button>
 
             <button
-                class="tile-icon-button remove-product-button"
+                class="remove-product-button"
                 type="button"
-                title="Remove product tile"
-                aria-label="Remove ${escapeHtml(product.name)}">
-                <span aria-hidden="true">⌫</span>
+                title="Remove product tile">
+
+                REMOVE
+
             </button>
 
             <button
-                class="tile-icon-button add-button"
-                type="button"
-                title="Add to cart"
-                aria-label="Add ${escapeHtml(product.name)} to cart">
-                <span aria-hidden="true">+</span>
+                class="add-button"
+                type="button">
+
+                +
+
             </button>
         `;
 
