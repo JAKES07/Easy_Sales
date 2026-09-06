@@ -322,6 +322,16 @@ def enforce_store_access():
             "/api/"
         ):
 
+            if store is not None and store["status"] == "EXPIRED":
+                return jsonify({
+                    "success": False,
+                    "code": "STORE_EXPIRED",
+                    "message": (
+                        "Your 30-day Easy Sales access period has expired. "
+                        "Please contact Easy Sales to renew your access."
+                    )
+                }), 403
+
             return jsonify({
                 "success": False,
                 "code": "STORE_INACTIVE",
@@ -334,7 +344,7 @@ def enforce_store_access():
         return redirect(
             url_for(
                 "store_access.store_access_page",
-                status="inactive"
+                status=("expired" if store is not None and store["status"] == "EXPIRED" else "inactive")
             )
         )
 
