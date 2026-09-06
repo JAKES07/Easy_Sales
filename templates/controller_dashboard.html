@@ -159,6 +159,18 @@
             color: #991b1b;
         }
 
+        .expired {
+            background: #ffedd5;
+            color: #9a3412;
+        }
+
+        .subscription-date {
+            margin: 8px 0 4px;
+            color: #555;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
         .actions {
             display: flex;
             flex-wrap: wrap;
@@ -243,6 +255,17 @@
             <div class="stat-number">{{ stats.inactive }}</div>
         </div>
 
+        <div class="stat-card">
+            <div>Expired Stores</div>
+            <div class="stat-number">{{ stats.expired }}</div>
+        </div>
+
+    </div>
+
+
+    <div class="card" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+        <strong>Client Management</strong>
+        <a href="{{ url_for('controller.client_status') }}" class="btn-view">📋 Client Status</a>
     </div>
 
 
@@ -309,13 +332,24 @@
                         ● ACTIVE
                     </div>
 
+                {% elif store["status"] == "EXPIRED" %}
+
+                    <div class="status expired">
+                        ● EXPIRED
+                    </div>
+
                 {% else %}
 
                     <div class="status inactive">
-                        ● INACTIVE
+                        ● {{ store["status"] }}
                     </div>
 
                 {% endif %}
+
+                <div class="subscription-date">
+                    <strong>Activated:</strong> {{ store["activated_at"] or "Not activated" }}<br>
+                    <strong>Expires:</strong> {{ store["expires_at"] or "Not set" }}
+                </div>
 
 
                 <div class="actions">
@@ -331,36 +365,18 @@
 
                     {% if store["status"] == "ACTIVE" %}
 
-                    <form
-                        action="{{ url_for('controller.deactivate',
-                        store_id=store['store_id']) }}"
-                        method="POST"
-                    >
+                    <form action="{{ url_for('controller.renew', store_id=store['store_id']) }}" method="POST">
+                        <button type="submit" class="btn-activate">↻ Renew 30 Days</button>
+                    </form>
 
-                        <button
-                            type="submit"
-                            class="btn-deactivate"
-                        >
-                            Deactivate
-                        </button>
-
+                    <form action="{{ url_for('controller.deactivate', store_id=store['store_id']) }}" method="POST">
+                        <button type="submit" class="btn-deactivate">Deactivate</button>
                     </form>
 
                     {% else %}
 
-                    <form
-                        action="{{ url_for('controller.activate',
-                        store_id=store['store_id']) }}"
-                        method="POST"
-                    >
-
-                        <button
-                            type="submit"
-                            class="btn-activate"
-                        >
-                            Activate
-                        </button>
-
+                    <form action="{{ url_for('controller.activate', store_id=store['store_id']) }}" method="POST">
+                        <button type="submit" class="btn-activate">✓ Activate 30 Days</button>
                     </form>
 
                     {% endif %}
