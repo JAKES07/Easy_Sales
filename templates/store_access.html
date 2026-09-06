@@ -114,6 +114,38 @@
             font-size: 12px;
             color: #888;
         }
+
+        /* Easy Sales WhatsApp + TikTok popup */
+        .social-popup-overlay {
+            position: fixed; inset: 0; z-index: 99999;
+            display: none; align-items: center; justify-content: center;
+            padding: 18px; background: rgba(0,0,0,.58);
+        }
+        .social-popup-overlay.show { display: flex; }
+        .social-popup {
+            width: min(390px, 100%); background:#fff; border-radius:22px;
+            padding:28px 22px 22px; text-align:center; position:relative;
+            box-shadow:0 20px 60px rgba(0,0,0,.30);
+        }
+        .social-popup-close {
+            position:absolute; top:10px; right:10px; width:38px; height:38px;
+            margin:0; padding:0; border:0; border-radius:50%;
+            background:#f0f0f0; color:#222; font-size:24px; cursor:pointer;
+        }
+        .social-popup-icon { font-size:42px; margin-bottom:5px; }
+        .social-popup h2 { margin:0 0 8px; color:#222; font-size:24px; }
+        .social-popup p { margin:0 0 18px; color:#666; line-height:1.45; }
+        .social-popup-link {
+            display:block; width:100%; padding:14px 16px; margin:10px 0 0;
+            border-radius:11px; text-decoration:none; font-weight:bold;
+            font-size:16px; box-sizing:border-box;
+        }
+        .social-popup-whatsapp { background:#25D366; color:#fff; }
+        .social-popup-tiktok { background:#111; color:#fff; }
+        .social-popup-later {
+            display:inline-block; width:auto; margin-top:12px; padding:7px 12px;
+            border:0; background:transparent; color:#777; font-size:13px; cursor:pointer;
+        }
     </style>
 </head>
 
@@ -187,6 +219,39 @@
                 message.style.display = "block";
             }
         });
+    </script>
+
+    <!-- Easy Sales WhatsApp + TikTok popup -->
+    <div id="easy-sales-social-popup" class="social-popup-overlay" role="dialog" aria-modal="true" aria-hidden="true">
+        <div class="social-popup">
+            <button type="button" class="social-popup-close" id="social-popup-close" aria-label="Close">&times;</button>
+            <div class="social-popup-icon">👋</div>
+            <h2>Need Help?</h2>
+            <p>Connect with Easy Sales for support, updates and more.</p>
+            <a class="social-popup-link social-popup-whatsapp" target="_blank" rel="noopener" href="https://wa.me/27729288696?text=Hi%20Easy%20Sales%2C%20I%20need%20help%20with%20my%20store.">💬 WhatsApp Easy Sales</a>
+            <a class="social-popup-link social-popup-tiktok" target="_blank" rel="noopener" href="https://www.tiktok.com/@easysales109">🎵 Follow Easy Sales on TikTok</a>
+            <button type="button" class="social-popup-later" id="social-popup-later">Maybe later</button>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            function initSocialPopup() {
+                const popup = document.getElementById("easy-sales-social-popup");
+                const close = document.getElementById("social-popup-close");
+                const later = document.getElementById("social-popup-later");
+                if (!popup) return;
+                function hide() { popup.classList.remove("show"); popup.setAttribute("aria-hidden", "true"); }
+                function show() { popup.classList.add("show"); popup.setAttribute("aria-hidden", "false"); }
+                close && close.addEventListener("click", hide);
+                later && later.addEventListener("click", hide);
+                popup.addEventListener("click", function(e){ if(e.target === popup) hide(); });
+                document.addEventListener("keydown", function(e){ if(e.key === "Escape") hide(); });
+                window.setTimeout(show, 700);
+            }
+            if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", initSocialPopup);
+            else initSocialPopup();
+        })();
     </script>
 </body>
 </html>
