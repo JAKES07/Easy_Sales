@@ -284,6 +284,7 @@
         role="dialog"
         aria-modal="true"
         aria-labelledby="social-popup-title"
+        aria-hidden="true"
     >
         <div class="social-popup">
             <button
@@ -332,37 +333,42 @@
     </div>
 
     <script>
-        (function () {
+        // Easy Sales social popup
+        // Runs after the page is fully loaded so it cannot be blocked by
+        // anything else on the login page.
+        document.addEventListener("DOMContentLoaded", function () {
             const popup = document.getElementById("easy-sales-social-popup");
             const closeButton = document.getElementById("social-popup-close");
             const laterButton = document.getElementById("social-popup-later");
 
-            function closeSocialPopup() {
-                popup.classList.remove("show");
-            }
+            if (!popup) return;
 
             function openSocialPopup() {
                 popup.classList.add("show");
+                popup.style.display = "flex";
+                popup.setAttribute("aria-hidden", "false");
             }
 
-            closeButton.addEventListener("click", closeSocialPopup);
-            laterButton.addEventListener("click", closeSocialPopup);
+            function closeSocialPopup() {
+                popup.classList.remove("show");
+                popup.style.display = "none";
+                popup.setAttribute("aria-hidden", "true");
+            }
+
+            if (closeButton) closeButton.addEventListener("click", closeSocialPopup);
+            if (laterButton) laterButton.addEventListener("click", closeSocialPopup);
 
             popup.addEventListener("click", function (event) {
-                if (event.target === popup) {
-                    closeSocialPopup();
-                }
+                if (event.target === popup) closeSocialPopup();
             });
 
             document.addEventListener("keydown", function (event) {
-                if (event.key === "Escape") {
-                    closeSocialPopup();
-                }
+                if (event.key === "Escape") closeSocialPopup();
             });
 
-            // Show shortly after the login page loads.
-            window.setTimeout(openSocialPopup, 700);
-        })();
+            // Always show on a fresh login-page load.
+            window.setTimeout(openSocialPopup, 400);
+        });
     </script>
 
 </body>
