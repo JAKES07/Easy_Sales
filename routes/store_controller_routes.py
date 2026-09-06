@@ -2,6 +2,8 @@
 # EASY SALES - SECURE CONTROLLER ROUTES
 # ============================================================
 
+from datetime import datetime
+
 from flask import (
     Blueprint,
     render_template,
@@ -18,6 +20,7 @@ from store_controller import (
     get_all_stores,
     get_store,
     activate_store,
+    renew_store,
     deactivate_store,
     reset_passkey,
 )
@@ -72,11 +75,17 @@ def load_dashboard():
         if store["status"] == "AVAILABLE"
     )
 
+    expired = sum(
+        1 for store in stores
+        if store["status"] == "EXPIRED"
+    )
+
     return stores, {
         "total": total,
         "active": active,
         "inactive": inactive,
         "available": available,
+        "expired": expired,
     }
 
 
@@ -308,12 +317,13 @@ def activate(store_id):
 
     try:
 
-        activate_store(
+        result = activate_store(
             store_id.upper()
         )
 
         flash(
-            f"{store_id.upper()} has been activated.",
+            f"{store_id.upper()} activated for 30 days. "
+            f"Expires: {result['expires_at']}.",
             "success"
         )
 
@@ -327,6 +337,30 @@ def activate(store_id):
     return redirect(
         url_for("controller.dashboard")
     )
+
+
+# ============================================================
+# RENEW A STORE FOR 30 DAYS
+# ============================================================
+
+@controller_bp.route(
+    "/renew/<store_id>",
+    methods=["POST"]
+)
+@controller_login_required
+def renew(store_id):
+
+    try:
+        result = renew_store(store_id.upper())
+        flash(
+            f"{store_id.upper()} renewed for 30 days. "
+            f"New expiry: {result['expires_at']}.",
+            "success"
+        )
+    except Exception as error:
+        flash(str(error), "error")
+
+    return redirect(url_for("controller.dashboard"))
 
 
 # ============================================================
@@ -461,6 +495,46 @@ def reset_store_data(store_id):
 
     return redirect(
         url_for("controller.dashboard")
+    )
+
+
+# ============================================================
+# CLIENT STATUS PAGE
+# ============================================================
+
+@controller_bp.route("/clients")
+@controller_login_required
+def client_status():
+
+    init_controller()
+    stores = get_all_stores()
+
+    now_dt = datetime.now()
+    client_rows = []
+
+    for store in stores:
+        expires_at = store["expires_at"]
+        days_remaining = None
+
+        if expires_at:
+            try:
+                expiry = datetime.strptime(
+                    expires_at,
+                    "%Y-%m-%d %H:%M:%S"
+                )
+                seconds = (expiry - now_dt).total_seconds()
+                days_remaining = max(0, int((seconds + 86399) // 86400))
+            except ValueError:
+                days_remaining = None
+
+        client_rows.append({
+            "store": store,
+            "days_remaining": days_remaining
+        })
+
+    return render_template(
+        "client_status.html",
+        clients=client_rows
     )
 
 
