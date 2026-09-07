@@ -1,28 +1,33 @@
-EASY_SALES RECEIPT + ESC/POS PRINTER UPGRADE
+EASY_SALES RECEIPT + BLUETOOTH ESC/POS PRINTER UPGRADE
 
 WHAT WAS ADDED
-1. After a successful sale, Easy_Sales opens a Sale Complete receipt preview.
-2. The preview supports Print Receipt using the device/browser print dialog.
-3. The preview supports Share Receipt using Android/browser sharing when available.
-4. A clipboard fallback is used if browser sharing is unavailable.
-5. The server now returns receipt line items and transaction ID from the completed sale.
-6. printer_escpos.py builds standard ESC/POS receipt bytes for 58mm and 80mm paper.
+1. Sale Complete receipt preview remains after every successful sale.
+2. System Print / PDF remains available exactly as before.
+3. Share Receipt remains available.
+4. Bluetooth Print was added.
+5. Connect Bluetooth Printer was added.
+6. Easy_Sales now builds ESC/POS commands in the browser and sends them to compatible BLE thermal printers.
+7. The receipt is sent directly to the printer; the user does not have to save a PDF first.
 
-IMPORTANT BLUETOOTH LIMITATION
-The Flask web app cannot reliably open a raw Bluetooth Classic SPP socket from normal Android Chrome.
-The ESC/POS builder therefore prepares the printer commands, but a native Android bridge is required
-for direct Bluetooth Classic printer communication.
+HOW TO USE
+1. Open Easy_Sales over HTTPS (the Render HTTPS address is suitable).
+2. Turn on the compatible Bluetooth thermal printer.
+3. Pairing is normally handled by the browser's Bluetooth chooser; follow the Android prompt.
+4. Complete a sale.
+5. On Sale Complete, press Connect Bluetooth Printer, select the printer, then press Bluetooth Print.
+6. Once connected during that browser session, Bluetooth Print can be used for later receipts.
 
-RECOMMENDED FINAL CONNECTION
-Easy_Sales Android app
-  -> native printer bridge
-  -> Android Bluetooth permission / paired device
-  -> Bluetooth Classic SPP
-  -> ESC/POS thermal printer
+IMPORTANT COMPATIBILITY NOTE
+There are two common kinds of Bluetooth receipt printers:
+- Bluetooth Low Energy (BLE): this upgrade can communicate with compatible ESC/POS BLE printers directly from supported Android browsers.
+- Bluetooth Classic SPP: normal Android Chrome cannot open the raw SPP socket from a web page. These printers need a native Android bridge/app or a compatible Android print service.
 
-For a browser-only deployment, use the Android/system print dialog where the printer is exposed by an
-installed print service. This is separate from raw ESC/POS Bluetooth communication.
+Therefore, do NOT assume that every printer advertised simply as "Bluetooth" will work directly from the website.
+When buying a printer for direct browser printing, specifically ask the seller whether it supports BLE/Web Bluetooth and ESC/POS.
+If you buy a Bluetooth Classic SPP printer, the Easy_Sales Android wrapper/native printer bridge can be added later without removing the current receipt/PDF features.
 
-PRINTER COMPATIBILITY
-Target common 58mm/80mm ESC/POS thermal receipt printers. Do not advertise universal support for every
-Bluetooth printer; proprietary printers may require their own protocol or driver.
+PRINTER SIZE
+The browser Bluetooth receipt defaults to 58mm formatting. The ESC/POS builder supports the existing 58mm/80mm formats on the server side as well.
+
+FALLBACK
+If Bluetooth printing is not supported by the browser or printer, System Print / PDF still works through the Android print dialog.
