@@ -833,6 +833,46 @@
 
 </div>
 
+
+<!-- ========================================================
+     RECEIPT PREVIEW
+     ======================================================== -->
+<div id="receipt-window" class="receipt-window" aria-hidden="true">
+    <div class="receipt-dialog">
+        <div class="receipt-actions-top no-print">
+            <h2>Sale Complete</h2>
+            <button id="close-receipt" type="button">×</button>
+        </div>
+        <div id="receipt-preview" class="receipt-paper"></div>
+        <div class="receipt-action-buttons no-print">
+            <button id="print-receipt" type="button">🖨️ Print Receipt</button>
+            <button id="share-receipt" type="button">📤 Share Receipt</button>
+            <button id="done-receipt" type="button">Done</button>
+        </div>
+    </div>
+</div>
+
+<style>
+.receipt-window{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center;z-index:9999;padding:16px;box-sizing:border-box;}
+.receipt-window.show{display:flex;}
+.receipt-dialog{background:#f4f4f4;border-radius:16px;width:min(100%,520px);max-height:94vh;overflow:auto;padding:16px;box-sizing:border-box;}
+.receipt-actions-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+.receipt-actions-top h2{margin:0;font-size:21px;}
+.receipt-actions-top button{border:0;background:#ddd;border-radius:50%;width:38px;height:38px;font-size:24px;cursor:pointer;}
+.receipt-paper{background:#fff;color:#111;width:100%;max-width:420px;margin:0 auto;padding:22px 18px;box-sizing:border-box;font-family:monospace;font-size:14px;line-height:1.45;box-shadow:0 2px 8px rgba(0,0,0,.12);}
+.receipt-center{text-align:center;}
+.receipt-bold{font-weight:700;}
+.receipt-line{border-top:1px dashed #555;margin:10px 0;}
+.receipt-item{display:flex;justify-content:space-between;gap:10px;}
+.receipt-item-name{flex:1;overflow-wrap:anywhere;}
+.receipt-item-total{white-space:nowrap;}
+.receipt-summary-row{display:flex;justify-content:space-between;gap:10px;}
+.receipt-action-buttons{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;}
+.receipt-action-buttons button{padding:13px 10px;border:0;border-radius:10px;background:#222;color:#fff;font-weight:700;font-size:15px;cursor:pointer;}
+.receipt-action-buttons button:last-child{grid-column:1/-1;background:#ddd;color:#111;}
+@media print{body *{visibility:hidden!important;}#receipt-window,#receipt-window *{visibility:visible!important;}#receipt-window{display:block!important;position:absolute;inset:0;background:#fff;padding:0;} .receipt-dialog{width:100%;max-height:none;overflow:visible;padding:0;background:#fff;} .receipt-paper{box-shadow:none;max-width:80mm;margin:0;padding:3mm;font-size:11px;} .no-print{display:none!important;}}
+</style>
+
 <!-- ========================================================
      JAVASCRIPT
      ======================================================== -->
