@@ -743,7 +743,7 @@ def save_sale():
             "sold_at": result["sold_at"],
             "transaction_id": result.get("transaction_id", ""),
             "items": result.get("items", []),
-            "store_name": session.get("store_name", "Easy Sales"),
+            "store_name": (get_store(session.get("store_id"))["store_name"] if get_store(session.get("store_id")) else session.get("store_name", "Easy Sales")),
             "currency": get_currency_settings() or {}
         })
 
