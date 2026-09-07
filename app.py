@@ -1316,6 +1316,148 @@ def stocktake_history():
 
 
 # ============================================================
+# INDIVIDUAL RECEIPT PDF
+# ============================================================
+
+@app.route(
+    "/api/receipt/pdf",
+    methods=["POST"]
+)
+def receipt_pdf():
+    """Generate a compact receipt PDF for sharing, including WhatsApp."""
+    try:
+        data = request.get_json(silent=True) or {}
+        items = data.get("items") or []
+
+        store_name = str(data.get("store_name") or "Easy Sales").strip()
+        sold_at = str(data.get("sold_at") or datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        transaction_id = str(data.get("transaction_id") or "")
+        payment_method = str(data.get("payment_method") or "").upper()
+        subtotal = float(data.get("subtotal") or 0)
+        sale_fee = float(data.get("sale_fee") or 0)
+        total = float(data.get("total") or 0)
+        cash_received = data.get("cash_received", None)
+        change = data.get("change", None)
+        currency = data.get("currency") or {}
+        currency_code = str(currency.get("currency_code") or currency.get("code") or "")
+        currency_symbol = str(currency.get("currency_symbol") or currency.get("symbol") or "")
+
+        def money(value):
+            return f"{currency_symbol}{float(value or 0):,.2f}"
+
+        # 80mm receipt-style PDF. Height expands with the number of items.
+        page_width = 80 * mm
+        page_height = max(115 * mm, (72 + len(items) * 12) * mm)
+        buffer = BytesIO()
+
+        from reportlab.pdfbase.pdfmetrics import stringWidth
+        from reportlab.platypus import SimpleDocTemplate
+
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=(page_width, page_height),
+            rightMargin=5 * mm,
+            leftMargin=5 * mm,
+            topMargin=5 * mm,
+            bottomMargin=5 * mm,
+            title="Easy_Sales Receipt"
+        )
+
+        styles = getSampleStyleSheet()
+        center = ParagraphStyle(
+            "ReceiptCenter",
+            parent=styles["Normal"],
+            fontName="Helvetica",
+            fontSize=9,
+            leading=11,
+            alignment=TA_CENTER,
+            spaceAfter=2
+        )
+        center_bold = ParagraphStyle(
+            "ReceiptCenterBold",
+            parent=center,
+            fontName="Helvetica-Bold",
+            fontSize=11,
+            leading=13
+        )
+        normal = ParagraphStyle(
+            "ReceiptNormal",
+            parent=styles["Normal"],
+            fontName="Helvetica",
+            fontSize=8.5,
+            leading=10.5,
+            spaceAfter=2
+        )
+        bold = ParagraphStyle(
+            "ReceiptBold",
+            parent=normal,
+            fontName="Helvetica-Bold"
+        )
+
+        story = []
+        safe_store = store_name.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        story.append(Paragraph(safe_store, center_bold))
+        story.append(Paragraph("RECEIPT", center))
+        story.append(Paragraph(sold_at.replace("&", "&amp;"), center))
+        if transaction_id:
+            story.append(Paragraph("#" + transaction_id[:18].upper(), center))
+
+        story.append(Spacer(1, 2 * mm))
+        story.append(Paragraph("-" * 42, center))
+
+        for item in items:
+            name = str(item.get("name") or "Item").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            qty = float(item.get("quantity") or 0)
+            line_total = float(item.get("line_total") or 0)
+            unit_price = float(item.get("unit_price") or 0)
+            story.append(Paragraph(
+                f"{name} x {qty:g} &nbsp;&nbsp; {money(line_total)}",
+                normal
+            ))
+            story.append(Paragraph(
+                f"{money(unit_price)} each",
+                ParagraphStyle("small", parent=normal, fontSize=7.5, leading=9)
+            ))
+
+        story.append(Paragraph("-" * 42, center))
+        story.append(Paragraph(f"Subtotal: {money(subtotal)}", normal))
+        if sale_fee > 0:
+            story.append(Paragraph(f"Sale Fee: {money(sale_fee)}", normal))
+        story.append(Paragraph(f"TOTAL: {money(total)}", bold))
+        story.append(Paragraph(f"Payment: {payment_method}", normal))
+        if cash_received is not None:
+            story.append(Paragraph(f"Cash: {money(cash_received)}", normal))
+            story.append(Paragraph(f"Change: {money(change)}", normal))
+
+        story.append(Paragraph("-" * 42, center))
+        story.append(Spacer(1, 1 * mm))
+        story.append(Paragraph("Thank you!", center))
+        story.append(Paragraph("Powered by Easy_Sales", center))
+        if currency_code:
+            story.append(Paragraph(f"Currency: {currency_code}", center))
+
+        doc.build(story)
+        buffer.seek(0)
+
+        short_id = transaction_id[:12] if transaction_id else datetime.now().strftime("%Y%m%d%H%M%S")
+        filename = f"Easy_Sales_Receipt_{short_id}.pdf"
+
+        return send_file(
+            buffer,
+            mimetype="application/pdf",
+            as_attachment=False,
+            download_name=filename
+        )
+
+    except Exception as error:
+        print("RECEIPT PDF ERROR:", error)
+        return jsonify({
+            "success": False,
+            "message": "Could not generate receipt PDF."
+        }), 500
+
+
+# ============================================================
 # STOCK CONTROL PDF REPORT
 # ============================================================
 
