@@ -844,14 +844,23 @@
             <button id="close-receipt" type="button">×</button>
         </div>
         <div id="receipt-preview" class="receipt-paper"></div>
+        <div class="receipt-printer-panel no-print">
+            <div class="receipt-printer-title">🖨️ Receipt Printer</div>
+            <div id="bluetooth-printer-status" class="receipt-printer-status">Not connected</div>
+            <div class="receipt-printer-row">
+                <select id="bluetooth-paper-width" aria-label="Paper width">
+                    <option value="58">58mm</option>
+                    <option value="80">80mm</option>
+                </select>
+                <button id="connect-bluetooth-printer" type="button">🔵 Connect Bluetooth Printer</button>
+            </div>
+        </div>
         <div class="receipt-action-buttons no-print">
-            <button id="print-receipt" type="button">🖨️ System Print / PDF</button>
+            <button id="system-print-receipt" type="button">🖨️ System Print / PDF</button>
             <button id="bluetooth-print-receipt" type="button">🧾 Bluetooth Print</button>
-            <button id="bluetooth-connect-printer" type="button">🔵 Connect Bluetooth Printer</button>
             <button id="share-receipt" type="button">📤 Share Receipt</button>
             <button id="done-receipt" type="button">Done</button>
         </div>
-        <div id="bluetooth-printer-status" class="bluetooth-printer-status no-print">Bluetooth printer: not connected</div>
     </div>
 </div>
 
@@ -870,10 +879,15 @@
 .receipt-item-name{flex:1;overflow-wrap:anywhere;}
 .receipt-item-total{white-space:nowrap;}
 .receipt-summary-row{display:flex;justify-content:space-between;gap:10px;}
+.receipt-printer-panel{background:#fff;border-radius:12px;padding:12px;margin-top:14px;border:1px solid #ddd;}
+.receipt-printer-title{font-weight:700;font-size:16px;margin-bottom:4px;}
+.receipt-printer-status{font-size:13px;color:#555;margin-bottom:10px;}
+.receipt-printer-row{display:grid;grid-template-columns:110px 1fr;gap:8px;}
+.receipt-printer-row select,.receipt-printer-row button{padding:12px 9px;border:0;border-radius:9px;background:#222;color:#fff;font-weight:700;font-size:14px;}
+.receipt-printer-row select{background:#eee;color:#111;}
 .receipt-action-buttons{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;}
 .receipt-action-buttons button{padding:13px 10px;border:0;border-radius:10px;background:#222;color:#fff;font-weight:700;font-size:15px;cursor:pointer;}
 .receipt-action-buttons button:last-child{grid-column:1/-1;background:#ddd;color:#111;}
-.bluetooth-printer-status{margin-top:10px;text-align:center;font-size:12px;color:#555;background:#fff;border-radius:8px;padding:8px;}
 @media print{body *{visibility:hidden!important;}#receipt-window,#receipt-window *{visibility:visible!important;}#receipt-window{display:block!important;position:absolute;inset:0;background:#fff;padding:0;} .receipt-dialog{width:100%;max-height:none;overflow:visible;padding:0;background:#fff;} .receipt-paper{box-shadow:none;max-width:80mm;margin:0;padding:3mm;font-size:11px;} .no-print{display:none!important;}}
 </style>
 
