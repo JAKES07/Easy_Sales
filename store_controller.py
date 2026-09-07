@@ -260,6 +260,50 @@ def create_store(store_name, notes=""):
 
 
 # ============================================================
+# STORE NAME UPDATE
+# ============================================================
+
+def update_store_name(store_id, store_name):
+    """Update the customer-facing business/store name used on receipts."""
+
+    store_id = str(store_id).strip().upper()
+    store_name = str(store_name or "").strip()
+
+    if not store_name:
+        raise ValueError("A store name is required.")
+
+    if len(store_name) > 120:
+        raise ValueError("Store name is too long (maximum 120 characters).")
+
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        UPDATE stores
+        SET store_name=?
+        WHERE store_id=?
+    """, (store_name, store_id))
+
+    if cur.rowcount == 0:
+        conn.close()
+        raise ValueError("Store not found.")
+
+    cur.execute("""
+        INSERT INTO store_activity
+        (store_id, action, description, created_at)
+        VALUES (?, ?, ?, ?)
+    """, (
+        store_id,
+        "STORE_NAME_UPDATED",
+        f"Store/receipt name changed to: {store_name}",
+        now()
+    ))
+
+    conn.commit()
+    conn.close()
+
+
+# ============================================================
 # STORE LOOKUPS
 # ============================================================
 
