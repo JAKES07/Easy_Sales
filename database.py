@@ -655,6 +655,13 @@ def complete_sale(cart, payment_method, sale_fee=0.0):
             ))
 
             total_sale += line_total
+            receipt_items.append({
+                "product_id": product_id,
+                "name": product["name"],
+                "quantity": quantity,
+                "unit_price": round(unit_price, 2),
+                "line_total": round(line_total, 2)
+            })
 
         connection.commit()
         return {
@@ -662,7 +669,8 @@ def complete_sale(cart, payment_method, sale_fee=0.0):
             "sale_fee": round(sale_fee, 2),
             "total": round(total_sale + sale_fee, 2),
             "sold_at": sold_at,
-            "transaction_id": transaction_id
+            "transaction_id": transaction_id,
+            "items": receipt_items
         }
 
     except Exception:
