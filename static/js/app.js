@@ -8,6 +8,7 @@
 // ============================================================
 
 let cart = [];
+let lastReceipt = null;
 
 
 // ============================================================
@@ -1005,6 +1006,17 @@ function setupButtons() {
 
     }
 
+    const closeReceiptButton = document.getElementById("close-receipt");
+    if (closeReceiptButton) closeReceiptButton.addEventListener("click", closeReceipt);
+
+    const doneReceiptButton = document.getElementById("done-receipt");
+    if (doneReceiptButton) doneReceiptButton.addEventListener("click", closeReceipt);
+
+    const printReceiptButton = document.getElementById("print-receipt");
+    if (printReceiptButton) printReceiptButton.addEventListener("click", printReceipt);
+
+    const shareReceiptButton = document.getElementById("share-receipt");
+    if (shareReceiptButton) shareReceiptButton.addEventListener("click", shareReceipt);
 
     setupProductSearch();
 
@@ -4859,6 +4871,26 @@ async function completeSale() {
         }
 
 
+        const cashReceived = selectedPaymentMethod === "cash"
+            ? (parseFloat(document.getElementById("cash-received")?.value) || 0)
+            : null;
+        const saleTotal = Number(data.total || 0);
+        const changeAmount = cashReceived === null ? 0 : Math.max(0, cashReceived - saleTotal);
+
+        lastReceipt = {
+            store_name: data.store_name || "Easy Sales",
+            sold_at: data.sold_at || new Date().toISOString(),
+            transaction_id: data.transaction_id || "",
+            payment_method: selectedPaymentMethod,
+            subtotal: Number(data.subtotal || 0),
+            sale_fee: Number(data.sale_fee || 0),
+            total: saleTotal,
+            cash_received: cashReceived,
+            change: changeAmount,
+            currency: data.currency || storeCurrency,
+            items: Array.isArray(data.items) ? data.items : []
+        };
+
         cart = [];
 
         updateCart();
@@ -4910,6 +4942,8 @@ async function completeSale() {
 
 
         await loadProducts();
+
+        showReceipt(lastReceipt);
 
 
         const stockWindow =
@@ -5944,4 +5978,122 @@ if (closeScannerButton) {
         closeScanner
     );
 
+}
+
+
+// ============================================================
+// RECEIPT PREVIEW / PRINT / SHARE
+// ============================================================
+
+function escapeReceiptHtml(value) {
+    return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+function receiptMoney(value, receipt) {
+    const symbol = (receipt && receipt.currency && receipt.currency.currency_symbol)
+        || (receipt && receipt.currency && receipt.currency.symbol)
+        || storeCurrency.symbol
+        || "";
+    return symbol + Number(value || 0).toFixed(2);
+}
+
+function buildReceiptHtml(receipt) {
+    if (!receipt) return "";
+    const items = Array.isArray(receipt.items) ? receipt.items : [];
+    let html = "";
+    html += `<div class="receipt-center receipt-bold">${escapeReceiptHtml(receipt.store_name || "Easy Sales")}</div>`;
+    html += `<div class="receipt-center">RECEIPT</div>`;
+    html += `<div class="receipt-center">${escapeReceiptHtml(receipt.sold_at || "")}</div>`;
+    if (receipt.transaction_id) html += `<div class="receipt-center">#${escapeReceiptHtml(receipt.transaction_id.slice(0, 12).toUpperCase())}</div>`;
+    html += `<div class="receipt-line"></div>`;
+    items.forEach(function(item) {
+        html += `<div class="receipt-item"><span class="receipt-item-name">${escapeReceiptHtml(item.name)} × ${Number(item.quantity || 0)}</span><span class="receipt-item-total">${receiptMoney(item.line_total, receipt)}</span></div>`;
+        html += `<div style="font-size:12px">${receiptMoney(item.unit_price, receipt)} each</div>`;
+    });
+    html += `<div class="receipt-line"></div>`;
+    html += `<div class="receipt-summary-row"><span>Subtotal</span><span>${receiptMoney(receipt.subtotal, receipt)}</span></div>`;
+    if (Number(receipt.sale_fee || 0) > 0) html += `<div class="receipt-summary-row"><span>Sale Fee</span><span>${receiptMoney(receipt.sale_fee, receipt)}</span></div>`;
+    html += `<div class="receipt-summary-row receipt-bold"><span>TOTAL</span><span>${receiptMoney(receipt.total, receipt)}</span></div>`;
+    html += `<div class="receipt-summary-row"><span>Payment</span><span>${escapeReceiptHtml(String(receipt.payment_method || "").toUpperCase())}</span></div>`;
+    if (receipt.cash_received !== null && receipt.cash_received !== undefined) {
+        html += `<div class="receipt-summary-row"><span>Cash</span><span>${receiptMoney(receipt.cash_received, receipt)}</span></div>`;
+        html += `<div class="receipt-summary-row"><span>Change</span><span>${receiptMoney(receipt.change, receipt)}</span></div>`;
+    }
+    html += `<div class="receipt-line"></div>`;
+    html += `<div class="receipt-center">Thank you!</div>`;
+    html += `<div class="receipt-center">Powered by Easy_Sales</div>`;
+    return html;
+}
+
+function buildReceiptText(receipt) {
+    if (!receipt) return "";
+    const currency = (receipt.currency && receipt.currency.currency_symbol) || storeCurrency.symbol || "";
+    const lines = [];
+    lines.push(receipt.store_name || "Easy Sales");
+    lines.push("RECEIPT");
+    lines.push(receipt.sold_at || "");
+    if (receipt.transaction_id) lines.push("Receipt #: " + receipt.transaction_id);
+    lines.push("------------------------------");
+    (receipt.items || []).forEach(function(item) {
+        lines.push(`${item.name} x ${item.quantity}  ${currency}${Number(item.line_total || 0).toFixed(2)}`);
+    });
+    lines.push("------------------------------");
+    lines.push(`Subtotal: ${currency}${Number(receipt.subtotal || 0).toFixed(2)}`);
+    if (Number(receipt.sale_fee || 0) > 0) lines.push(`Sale Fee: ${currency}${Number(receipt.sale_fee || 0).toFixed(2)}`);
+    lines.push(`TOTAL: ${currency}${Number(receipt.total || 0).toFixed(2)}`);
+    lines.push(`Payment: ${String(receipt.payment_method || "").toUpperCase()}`);
+    if (receipt.cash_received !== null && receipt.cash_received !== undefined) {
+        lines.push(`Cash: ${currency}${Number(receipt.cash_received || 0).toFixed(2)}`);
+        lines.push(`Change: ${currency}${Number(receipt.change || 0).toFixed(2)}`);
+    }
+    lines.push("------------------------------");
+    lines.push("Thank you!");
+    lines.push("Powered by Easy_Sales");
+    return lines.join("\n");
+}
+
+function showReceipt(receipt) {
+    const windowElement = document.getElementById("receipt-window");
+    const preview = document.getElementById("receipt-preview");
+    if (!windowElement || !preview || !receipt) return;
+    preview.innerHTML = buildReceiptHtml(receipt);
+    windowElement.classList.add("show");
+    windowElement.setAttribute("aria-hidden", "false");
+}
+
+function closeReceipt() {
+    const windowElement = document.getElementById("receipt-window");
+    if (windowElement) {
+        windowElement.classList.remove("show");
+        windowElement.setAttribute("aria-hidden", "true");
+    }
+}
+
+function printReceipt() {
+    if (!lastReceipt) return;
+    window.print();
+}
+
+async function shareReceipt() {
+    if (!lastReceipt) return;
+    const text = buildReceiptText(lastReceipt);
+    if (navigator.share) {
+        try {
+            await navigator.share({ title: "Easy_Sales Receipt", text: text });
+            return;
+        } catch (error) {
+            if (error && error.name === "AbortError") return;
+        }
+    }
+    try {
+        await navigator.clipboard.writeText(text);
+        showMessage("Receipt copied. You can paste it into WhatsApp or another app.");
+    } catch (error) {
+        showMessage("Receipt sharing is not supported on this browser.");
+    }
 }
