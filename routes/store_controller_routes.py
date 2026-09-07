@@ -20,6 +20,7 @@ from store_controller import (
     activate_store,
     deactivate_store,
     reset_passkey,
+    update_store_name,
 )
 
 from controller_auth import (
@@ -461,6 +462,49 @@ def reset_store_data(store_id):
 
     return redirect(
         url_for("controller.dashboard")
+    )
+
+
+# ============================================================
+# UPDATE STORE / RECEIPT NAME
+# ============================================================
+
+@controller_bp.route(
+    "/store/<store_id>/update-name",
+    methods=["POST"]
+)
+@controller_login_required
+def update_name(store_id):
+
+    try:
+
+        store_name = request.form.get(
+            "store_name",
+            ""
+        ).strip()
+
+        update_store_name(
+            store_id.upper(),
+            store_name
+        )
+
+        flash(
+            f"Store/receipt name updated for {store_id.upper()}.",
+            "success"
+        )
+
+    except Exception as error:
+
+        flash(
+            str(error),
+            "error"
+        )
+
+    return redirect(
+        url_for(
+            "controller.store_details",
+            store_id=store_id.upper()
+        )
     )
 
 
