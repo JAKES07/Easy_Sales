@@ -50,6 +50,56 @@
             word-break: break-word;
         }
 
+        .edit-form {
+            margin-top: 10px;
+            padding: 18px;
+            background: #f8fafc;
+            border-radius: 10px;
+            border: 1px solid #e5e7eb;
+        }
+
+        .edit-form input {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 13px;
+            margin: 8px 0 12px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+
+        .btn-save {
+            border: none;
+            padding: 12px 18px;
+            border-radius: 7px;
+            background: #16803c;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .help-text {
+            color: #666;
+            font-size: 13px;
+            margin-top: 0;
+        }
+
+        .flash {
+            padding: 12px 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .flash-success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .flash-error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
         .back {
             display: inline-block;
             margin-top: 20px;
@@ -80,11 +130,33 @@
 
 <div class="container">
 
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+            <div class="flash flash-{{ category }}">{{ message }}</div>
+        {% endfor %}
+    {% endwith %}
+
     <div class="card">
 
         <div class="row">
-            <div class="label">STORE NAME</div>
+            <div class="label">STORE / RECEIPT NAME</div>
             <div class="value">{{ store["store_name"] }}</div>
+
+            <div class="edit-form">
+                <strong>Change the name shown on customer receipts</strong>
+                <p class="help-text">This is the business/store name Easy_Sales will use at the top of the receipt.</p>
+
+                <form action="{{ url_for('controller.update_name', store_id=store['store_id']) }}" method="POST">
+                    <input
+                        type="text"
+                        name="store_name"
+                        value="{{ store['store_name'] }}"
+                        maxlength="120"
+                        required
+                    >
+                    <button type="submit" class="btn-save">💾 Save Store Name</button>
+                </form>
+            </div>
         </div>
 
         <div class="row">
