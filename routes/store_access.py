@@ -55,16 +55,6 @@ def store_access_login():
         session.pop("store_id", None)
         session.pop("store_name", None)
 
-        if result == "STORE_EXPIRED":
-            return jsonify({
-                "success": False,
-                "code": "STORE_EXPIRED",
-                "message": (
-                    "Your 30-day Easy Sales access period has expired. "
-                    "Please contact Easy Sales to renew your access."
-                )
-            }), 403
-
         if result == "STORE_INACTIVE":
             return jsonify({
                 "success": False,
