@@ -582,6 +582,7 @@ def complete_sale(cart, payment_method, sale_fee=0.0):
     sold_at = now_string()
     transaction_id = str(uuid.uuid4())
     total_sale = 0.0
+    receipt_items = []
 
     try:
         sale_fee = round(float(sale_fee or 0), 2)
