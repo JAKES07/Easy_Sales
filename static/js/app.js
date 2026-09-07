@@ -4899,7 +4899,8 @@ async function completeSale() {
         }
 
 
-        const cashReceived = selectedPaymentMethod === "cash"
+        const completedPaymentMethod = selectedPaymentMethod;
+        const cashReceived = completedPaymentMethod === "cash"
             ? (parseFloat(document.getElementById("cash-received")?.value) || 0)
             : null;
         const saleTotal = Number(data.total || 0);
@@ -4909,7 +4910,7 @@ async function completeSale() {
             store_name: data.store_name || "Easy Sales",
             sold_at: data.sold_at || new Date().toISOString(),
             transaction_id: data.transaction_id || "",
-            payment_method: selectedPaymentMethod,
+            payment_method: completedPaymentMethod,
             subtotal: Number(data.subtotal || 0),
             sale_fee: Number(data.sale_fee || 0),
             total: saleTotal,
@@ -4981,7 +4982,7 @@ async function completeSale() {
             try {
                 await printReceiptToBluetooth(
                     lastReceipt,
-                    selectedPaymentMethod === "cash"
+                    completedPaymentMethod === "cash"
                 );
             } catch (printerError) {
                 console.warn("AUTO BLUETOOTH PRINT ERROR:", printerError);
