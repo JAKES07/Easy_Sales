@@ -9,13 +9,10 @@
 
 let cart = [];
 let lastReceipt = null;
-
-// ============================================================
-// BLUETOOTH ESC/POS PRINTER (Web Bluetooth / BLE)
-// ============================================================
 let bluetoothPrinterDevice = null;
 let bluetoothPrinterCharacteristic = null;
-
+let bluetoothPrinterService = null;
+let bluetoothPrinterPaperWidth = 58;
 
 
 // ============================================================
@@ -1022,14 +1019,32 @@ function setupButtons() {
     const printReceiptButton = document.getElementById("print-receipt");
     if (printReceiptButton) printReceiptButton.addEventListener("click", printReceipt);
 
-    const bluetoothPrintButton = document.getElementById("bluetooth-print-receipt");
-    if (bluetoothPrintButton) bluetoothPrintButton.addEventListener("click", printBluetoothReceipt);
-
-    const bluetoothConnectButton = document.getElementById("bluetooth-connect-printer");
-    if (bluetoothConnectButton) bluetoothConnectButton.addEventListener("click", connectBluetoothPrinter);
-
     const shareReceiptButton = document.getElementById("share-receipt");
     if (shareReceiptButton) shareReceiptButton.addEventListener("click", shareReceipt);
+
+    const bluetoothConnectButton = document.getElementById("connect-bluetooth-printer");
+    if (bluetoothConnectButton) bluetoothConnectButton.addEventListener("click", connectBluetoothPrinter);
+
+    const bluetoothPrintButton = document.getElementById("bluetooth-print-receipt");
+    if (bluetoothPrintButton) bluetoothPrintButton.addEventListener("click", function() {
+        if (lastReceipt) printReceiptToBluetooth(lastReceipt, false);
+    });
+
+    const systemPrintButton = document.getElementById("system-print-receipt");
+    if (systemPrintButton) systemPrintButton.addEventListener("click", printReceipt);
+
+    const bluetoothPaperSelect = document.getElementById("bluetooth-paper-width");
+    if (bluetoothPaperSelect) {
+        bluetoothPrinterPaperWidth = Number(bluetoothPaperSelect.value || 58);
+        bluetoothPaperSelect.addEventListener("change", function() {
+            bluetoothPrinterPaperWidth = Number(this.value || 58);
+            localStorage.setItem("easy_sales_printer_paper_width", String(bluetoothPrinterPaperWidth));
+        });
+    }
+    try {
+        bluetoothPrinterPaperWidth = Number(localStorage.getItem("easy_sales_printer_paper_width") || 58);
+        if (bluetoothPaperSelect) bluetoothPaperSelect.value = String(bluetoothPrinterPaperWidth);
+    } catch (e) {}
 
     setupProductSearch();
 
@@ -4958,6 +4973,22 @@ async function completeSale() {
 
         showReceipt(lastReceipt);
 
+        // If a Bluetooth ESC/POS printer is already connected, print every
+        // completed sale automatically. Cash sales also send the drawer-kick
+        // command; card sales only print the receipt. Printing errors never
+        // cancel an already completed sale.
+        if (bluetoothPrinterCharacteristic) {
+            try {
+                await printReceiptToBluetooth(
+                    lastReceipt,
+                    selectedPaymentMethod === "cash"
+                );
+            } catch (printerError) {
+                console.warn("AUTO BLUETOOTH PRINT ERROR:", printerError);
+                showMessage("Sale completed, but Bluetooth printing failed. Check the printer connection.");
+            }
+        }
+
 
         const stockWindow =
             document.getElementById(
@@ -6070,6 +6101,226 @@ function buildReceiptText(receipt) {
     return lines.join("\n");
 }
 
+// ============================================================
+// BLUETOOTH ESC/POS PRINTER
+// ============================================================
+
+const ESCPOS = {
+    INIT: [0x1B, 0x40],
+    ALIGN_LEFT: [0x1B, 0x61, 0x00],
+    ALIGN_CENTER: [0x1B, 0x61, 0x01],
+    BOLD_ON: [0x1B, 0x45, 0x01],
+    BOLD_OFF: [0x1B, 0x45, 0x00],
+    FEED: [0x0A],
+    CUT: [0x1D, 0x56, 0x00],
+    // ESC p m t1 t2 — cash drawer kick. This is the common ESC/POS
+    // command used by receipt printers with a drawer port.
+    DRAWER_KICK: [0x1B, 0x70, 0x00, 0x19, 0xFA]
+};
+
+// Common BLE service/characteristic UUIDs found on ESC/POS thermal printers.
+// Web Bluetooth can only use BLE/GATT printers; Bluetooth Classic SPP printers
+// require the native Android bridge used by a packaged Android version.
+const PRINTER_BLE_SERVICES = [
+    "0000ffe0-0000-1000-8000-00805f9b34fb",
+    "000018f0-0000-1000-8000-00805f9b34fb",
+    "0000ae30-0000-1000-8000-00805f9b34fb",
+    "0000ff00-0000-1000-8000-00805f9b34fb",
+    "49535343-fe7d-4ae5-8fa9-9fafd205e455"
+];
+
+function printerStatus(message) {
+    const el = document.getElementById("bluetooth-printer-status");
+    if (el) el.textContent = message;
+}
+
+function bytesToTextBytes(value) {
+    // Thermal receipts are deliberately kept to the printer-safe ASCII subset.
+    // Currency values are already represented by the selected currency symbol
+    // in the browser preview; printer output uses the currency code when needed.
+    return Array.from(String(value == null ? "" : value)).map(function(ch) {
+        const code = ch.charCodeAt(0);
+        return code <= 255 ? code : 0x3F;
+    });
+}
+
+function escposReceiptBytes(receipt, paperWidth) {
+    const width = Number(paperWidth) === 80 ? 48 : 32;
+    const currency = (receipt.currency && (receipt.currency.currency_symbol || receipt.currency.symbol)) || storeCurrency.symbol || "";
+    const lines = [];
+    const push = arr => lines.push(...arr);
+    const lineText = function(text) { push(bytesToTextBytes(text)); push(ESCPOS.FEED); };
+    const right = function(label, amount) {
+        const value = label + currency + Number(amount || 0).toFixed(2);
+        lineText(value.slice(-width).padStart(width));
+    };
+
+    push(ESCPOS.INIT);
+    push(ESCPOS.ALIGN_CENTER, ESCPOS.BOLD_ON);
+    lineText(receipt.store_name || "Easy Sales");
+    push(ESCPOS.BOLD_OFF);
+    lineText("RECEIPT");
+    lineText(receipt.sold_at || "");
+    if (receipt.transaction_id) lineText("#" + String(receipt.transaction_id).slice(0, 18).toUpperCase());
+    lineText("-".repeat(width));
+    push(ESCPOS.ALIGN_LEFT);
+
+    (receipt.items || []).forEach(function(item) {
+        const name = String(item.name || "").slice(0, width);
+        const qty = Number(item.quantity || 0);
+        const total = currency + Number(item.line_total || 0).toFixed(2);
+        lineText(name);
+        const detail = (qty + " x " + currency + Number(item.unit_price || 0).toFixed(2));
+        lineText((detail + " " + total).slice(0, width));
+    });
+
+    lineText("-".repeat(width));
+    right("Subtotal: ", receipt.subtotal);
+    if (Number(receipt.sale_fee || 0) > 0) right("Fee: ", receipt.sale_fee);
+    push(ESCPOS.BOLD_ON);
+    right("TOTAL: ", receipt.total);
+    push(ESCPOS.BOLD_OFF);
+    lineText("Payment: " + String(receipt.payment_method || "").toUpperCase());
+    if (receipt.cash_received !== null && receipt.cash_received !== undefined) {
+        right("Cash: ", receipt.cash_received);
+        right("Change: ", receipt.change);
+    }
+    push(ESCPOS.ALIGN_CENTER);
+    lineText("Thank you!");
+    lineText("Powered by Easy_Sales");
+    push(ESCPOS.FEED, ESCPOS.FEED);
+    push(ESCPOS.CUT);
+    return new Uint8Array(lines);
+}
+
+async function findWritablePrinterCharacteristic(server) {
+    for (const serviceUuid of PRINTER_BLE_SERVICES) {
+        try {
+            const service = await server.getPrimaryService(serviceUuid);
+            const characteristics = await service.getCharacteristics();
+            for (const characteristic of characteristics) {
+                const props = characteristic.properties || {};
+                if (props.writeWithoutResponse || props.write) {
+                    return { service: service, characteristic: characteristic };
+                }
+            }
+        } catch (e) {
+            // Service not exposed by this printer; try the next common UUID.
+        }
+    }
+
+    // Some printers expose additional primary services under custom UUIDs.
+    // If the browser permits getPrimaryServices(), inspect them as a fallback.
+    try {
+        const services = await server.getPrimaryServices();
+        for (const service of services) {
+            try {
+                const characteristics = await service.getCharacteristics();
+                for (const characteristic of characteristics) {
+                    const props = characteristic.properties || {};
+                    if (props.writeWithoutResponse || props.write) {
+                        return { service: service, characteristic: characteristic };
+                    }
+                }
+            } catch (e) {}
+        }
+    } catch (e) {}
+
+    return null;
+}
+
+async function connectBluetoothPrinter() {
+    if (!navigator.bluetooth || !navigator.bluetooth.requestDevice) {
+        printerStatus("Bluetooth printing is not supported by this browser.");
+        showMessage("Bluetooth printing requires an Android browser/app with Web Bluetooth support.");
+        return;
+    }
+
+    const button = document.getElementById("connect-bluetooth-printer");
+    if (button) button.disabled = true;
+    printerStatus("Searching for Bluetooth printer...");
+
+    try {
+        const device = await navigator.bluetooth.requestDevice({
+            acceptAllDevices: true,
+            optionalServices: PRINTER_BLE_SERVICES
+        });
+
+        bluetoothPrinterDevice = device;
+        device.addEventListener("gattserverdisconnected", function() {
+            bluetoothPrinterCharacteristic = null;
+            bluetoothPrinterService = null;
+            printerStatus("Printer disconnected");
+        });
+
+        if (!device.gatt) throw new Error("The selected Bluetooth device does not provide GATT.");
+        const server = await device.gatt.connect();
+        const result = await findWritablePrinterCharacteristic(server);
+        if (!result) {
+            bluetoothPrinterCharacteristic = null;
+            bluetoothPrinterService = null;
+            throw new Error("No writable ESC/POS Bluetooth characteristic was found. This printer may use Bluetooth Classic SPP.");
+        }
+
+        bluetoothPrinterService = result.service;
+        bluetoothPrinterCharacteristic = result.characteristic;
+        printerStatus("Connected: " + (device.name || "Bluetooth printer"));
+        showMessage("Bluetooth printer connected.");
+    } catch (error) {
+        console.error("BLUETOOTH PRINTER ERROR:", error);
+        bluetoothPrinterCharacteristic = null;
+        bluetoothPrinterService = null;
+        if (error && error.name === "NotFoundError") {
+            printerStatus("No printer selected.");
+        } else {
+            printerStatus("Printer connection failed.");
+            showMessage(error.message || "Could not connect to the Bluetooth printer.");
+        }
+    } finally {
+        if (button) button.disabled = false;
+    }
+}
+
+async function writeEscposChunks(bytes) {
+    if (!bluetoothPrinterCharacteristic) {
+        throw new Error("No Bluetooth printer is connected.");
+    }
+
+    // BLE printers commonly accept small writes. 180 bytes keeps the payload
+    // below the typical negotiated ATT payload while allowing faster receipts.
+    const chunkSize = 180;
+    const supportsNoResponse = !!(bluetoothPrinterCharacteristic.properties && bluetoothPrinterCharacteristic.properties.writeWithoutResponse);
+
+    for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+        const chunk = bytes.slice(offset, Math.min(offset + chunkSize, bytes.length));
+        if (supportsNoResponse && bluetoothPrinterCharacteristic.writeValueWithoutResponse) {
+            await bluetoothPrinterCharacteristic.writeValueWithoutResponse(chunk);
+        } else {
+            await bluetoothPrinterCharacteristic.writeValue(chunk);
+        }
+        await new Promise(resolve => setTimeout(resolve, 15));
+    }
+}
+
+async function printReceiptToBluetooth(receipt, openDrawer) {
+    if (!bluetoothPrinterCharacteristic) {
+        throw new Error("Connect a Bluetooth ESC/POS printer first.");
+    }
+
+    const receiptBytes = escposReceiptBytes(receipt, bluetoothPrinterPaperWidth);
+    await writeEscposChunks(receiptBytes);
+
+    // Only cash sales open the drawer. The drawer must be physically connected
+    // to the receipt printer's cash-drawer port for this command to work.
+    if (openDrawer) {
+        await new Promise(resolve => setTimeout(resolve, 80));
+        await writeEscposChunks(new Uint8Array(ESCPOS.DRAWER_KICK));
+    }
+
+    printerStatus("Last print: successful");
+    return true;
+}
+
 function showReceipt(receipt) {
     const windowElement = document.getElementById("receipt-window");
     const preview = document.getElementById("receipt-preview");
@@ -6090,168 +6341,6 @@ function closeReceipt() {
 function printReceipt() {
     if (!lastReceipt) return;
     window.print();
-}
-
-// Common BLE services used by ESC/POS thermal printers.
-const ESC_POS_BLE_SERVICES = [
-    "000018f0-0000-1000-8000-00805f9b34fb",
-    "0000ffe0-0000-1000-8000-00805f9b34fb",
-    "0000ffe5-0000-1000-8000-00805f9b34fb",
-    "6e400001-b5a3-f393-e0a9-e50e24dcca9e"
-];
-
-function escPosText(value) {
-    // Most inexpensive ESC/POS printers accept CP437/ASCII-like text.
-    // Non-ASCII characters are replaced rather than breaking the print job.
-    return String(value ?? "").replace(/[^\x00-\xFF]/g, "?");
-}
-
-function escPosBytes(receipt, paperWidth = 58) {
-    const width = Number(paperWidth) === 80 ? 48 : 32;
-    const enc = new TextEncoder();
-    const bytes = [];
-    const push = (...values) => values.forEach(v => bytes.push(v));
-    const addText = value => bytes.push(...enc.encode(escPosText(value)));
-    const addLine = value => { addText(value); push(0x0A); };
-    const center = () => push(0x1B, 0x61, 0x01);
-    const left = () => push(0x1B, 0x61, 0x00);
-    const bold = on => push(0x1B, 0x45, on ? 0x01 : 0x00);
-    const money = value => {
-        const symbol = (receipt.currency && (receipt.currency.currency_symbol || receipt.currency.symbol)) || storeCurrency.symbol || "";
-        return symbol + Number(value || 0).toFixed(2);
-    };
-
-    push(0x1B, 0x40);
-    center();
-    bold(true);
-    addLine(receipt.store_name || "Easy Sales");
-    bold(false);
-    addLine("RECEIPT");
-    addLine(receipt.sold_at || "");
-    if (receipt.transaction_id) addLine("#" + String(receipt.transaction_id).slice(0, 12).toUpperCase());
-    addLine("-".repeat(width));
-    left();
-
-    (receipt.items || []).forEach(item => {
-        const name = escPosText(item.name || "");
-        const qty = Number(item.quantity || 0);
-        const total = money(item.line_total);
-        addLine((name + " x " + qty).slice(0, width - total.length) + total);
-        addLine(money(item.unit_price) + " each");
-    });
-
-    addLine("-".repeat(width));
-    addLine(("Subtotal" + money(receipt.subtotal)).padStart(width));
-    if (Number(receipt.sale_fee || 0) > 0) addLine(("Sale Fee" + money(receipt.sale_fee)).padStart(width));
-    bold(true);
-    addLine(("TOTAL" + money(receipt.total)).padStart(width));
-    bold(false);
-    addLine(("Payment" + String(receipt.payment_method || "").toUpperCase()).padStart(width));
-    if (receipt.cash_received !== null && receipt.cash_received !== undefined) {
-        addLine(("Cash" + money(receipt.cash_received)).padStart(width));
-        addLine(("Change" + money(receipt.change)).padStart(width));
-    }
-    addLine("-".repeat(width));
-    center();
-    addLine("Thank you!");
-    addLine("Powered by Easy_Sales");
-    addLine("");
-    addLine("");
-    // Full cut where supported.
-    push(0x1D, 0x56, 0x00);
-    return new Uint8Array(bytes);
-}
-
-function bluetoothStatus(message) {
-    const el = document.getElementById("bluetooth-printer-status");
-    if (el) el.textContent = message;
-}
-
-async function findWritablePrinterCharacteristic(server) {
-    const services = await server.getPrimaryServices();
-    for (const service of services) {
-        let characteristics = [];
-        try { characteristics = await service.getCharacteristics(); } catch (e) { continue; }
-        for (const characteristic of characteristics) {
-            const p = characteristic.properties || {};
-            if (p.writeWithoutResponse || p.write) return characteristic;
-        }
-    }
-    return null;
-}
-
-async function connectBluetoothPrinter() {
-    if (!navigator.bluetooth) {
-        bluetoothStatus("Bluetooth printing is not supported by this browser. Use Android Chrome on HTTPS or the Easy_Sales Android printer bridge.");
-        return false;
-    }
-
-    try {
-        bluetoothStatus("Choose your Bluetooth thermal printer...");
-        bluetoothPrinterDevice = await navigator.bluetooth.requestDevice({
-            acceptAllDevices: true,
-            optionalServices: ESC_POS_BLE_SERVICES
-        });
-
-        bluetoothPrinterDevice.addEventListener("gattserverdisconnected", () => {
-            bluetoothPrinterCharacteristic = null;
-            bluetoothStatus("Printer disconnected.");
-        });
-
-        bluetoothStatus("Connecting to " + (bluetoothPrinterDevice.name || "printer") + "...");
-        const server = await bluetoothPrinterDevice.gatt.connect();
-        bluetoothPrinterCharacteristic = await findWritablePrinterCharacteristic(server);
-
-        if (!bluetoothPrinterCharacteristic) {
-            bluetoothStatus("Connected, but no writable printer characteristic was found. This printer may use Bluetooth Classic SPP.");
-            return false;
-        }
-
-        bluetoothStatus("Connected: " + (bluetoothPrinterDevice.name || "Bluetooth printer"));
-        return true;
-    } catch (error) {
-        console.error("Bluetooth printer connection error:", error);
-        bluetoothStatus("Bluetooth connection cancelled or failed.");
-        return false;
-    }
-}
-
-async function writeBluetoothChunks(data) {
-    if (!bluetoothPrinterCharacteristic) return false;
-    // Keep chunks small for inexpensive BLE printer characteristics.
-    const chunkSize = 180;
-    for (let offset = 0; offset < data.length; offset += chunkSize) {
-        const chunk = data.slice(offset, Math.min(offset + chunkSize, data.length));
-        if (bluetoothPrinterCharacteristic.properties.writeWithoutResponse && bluetoothPrinterCharacteristic.writeValueWithoutResponse) {
-            await bluetoothPrinterCharacteristic.writeValueWithoutResponse(chunk);
-        } else {
-            await bluetoothPrinterCharacteristic.writeValue(chunk);
-        }
-        await new Promise(resolve => setTimeout(resolve, 25));
-    }
-    return true;
-}
-
-async function printBluetoothReceipt() {
-    if (!lastReceipt) return;
-
-    if (!bluetoothPrinterDevice || !bluetoothPrinterCharacteristic || !bluetoothPrinterDevice.gatt?.connected) {
-        const connected = await connectBluetoothPrinter();
-        if (!connected) return;
-    }
-
-    try {
-        bluetoothStatus("Printing receipt...");
-        const data = escPosBytes(lastReceipt, 58);
-        await writeBluetoothChunks(data);
-        bluetoothStatus("Receipt printed successfully.");
-        showMessage("Receipt sent to Bluetooth printer.");
-    } catch (error) {
-        console.error("Bluetooth print error:", error);
-        bluetoothPrinterCharacteristic = null;
-        bluetoothStatus("Could not print. Reconnect the printer and try again.");
-        showMessage("Bluetooth printing failed. Check that the printer is on and connected.");
-    }
 }
 
 async function shareReceipt() {
