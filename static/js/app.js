@@ -6346,6 +6346,64 @@ function printReceipt() {
 
 async function shareReceipt() {
     if (!lastReceipt) return;
+
+    // Prefer sharing the actual receipt as a PDF file. On Android, this opens
+    // the normal system share sheet so WhatsApp can receive the PDF as a
+    // document/attachment instead of pasting the receipt as plain text.
+    try {
+        const response = await fetch("/api/receipt/pdf", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(lastReceipt)
+        });
+
+        if (!response.ok) {
+            throw new Error("Receipt PDF generation failed.");
+        }
+
+        const blob = await response.blob();
+        const transactionId = String(lastReceipt.transaction_id || "receipt").slice(0, 12);
+        const file = new File(
+            [blob],
+            `Easy_Sales_Receipt_${transactionId}.pdf`,
+            { type: "application/pdf" }
+        );
+
+        if (navigator.share && navigator.canShare) {
+            const shareData = {
+                title: "Easy_Sales Receipt",
+                text: "Easy_Sales receipt",
+                files: [file]
+            };
+
+            if (navigator.canShare(shareData)) {
+                await navigator.share(shareData);
+                return;
+            }
+        }
+
+        // Some browsers can share text but not files. Fall back to opening the
+        // generated PDF so the user can use Android's share/download controls.
+        const pdfUrl = URL.createObjectURL(blob);
+        const opened = window.open(pdfUrl, "_blank");
+        if (!opened) {
+            const link = document.createElement("a");
+            link.href = pdfUrl;
+            link.download = file.name;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        }
+        setTimeout(() => URL.revokeObjectURL(pdfUrl), 60000);
+        showMessage("PDF receipt created. Use the Android share button to send it to WhatsApp.");
+        return;
+    } catch (error) {
+        if (error && error.name === "AbortError") return;
+        console.warn("PDF RECEIPT SHARE ERROR:", error);
+    }
+
+    // Final fallback: keep the old text-sharing behavior if PDF generation or
+    // file sharing is unavailable on the browser.
     const text = buildReceiptText(lastReceipt);
     if (navigator.share) {
         try {
