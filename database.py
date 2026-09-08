@@ -253,6 +253,43 @@ def create_database():
     """Compatibility startup hook. Client databases are created per store."""
     return None
 
+
+# ============================================================
+# EMPLOYEE MODE SECURITY
+# ============================================================
+
+
+def get_employee_mode_password_hash():
+    connection = get_connection()
+    try:
+        row = connection.execute("""
+            SELECT employee_mode_password_hash
+            FROM store_settings
+            WHERE id = 1
+        """).fetchone()
+        return row["employee_mode_password_hash"] if row else None
+    finally:
+        connection.close()
+
+
+def set_employee_mode_password_hash(password_hash):
+    connection = get_connection()
+    try:
+        connection.execute("""
+            INSERT INTO store_settings
+                (id, employee_mode_password_hash, updated_at)
+            VALUES (1, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                employee_mode_password_hash = excluded.employee_mode_password_hash,
+                updated_at = excluded.updated_at
+        """, (password_hash, now_string()))
+        connection.commit()
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
+
 def _ensure_column(cursor, table_name, column_name, definition):
     columns = {
         row[1] for row in cursor.execute(
