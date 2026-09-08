@@ -94,6 +94,18 @@ def now():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
+def _ensure_column(cursor, table_name, column_name, definition):
+    columns = {
+        row[1] for row in cursor.execute(
+            f"PRAGMA table_info({table_name})"
+        ).fetchall()
+    }
+    if column_name not in columns:
+        cursor.execute(
+            f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}"
+        )
+
+
 # ============================================================
 # STORE ID / PASSKEY GENERATION
 # ============================================================
@@ -146,9 +158,17 @@ def init_controller():
             created_at TEXT NOT NULL,
             activated_at TEXT,
             deactivated_at TEXT,
-            notes TEXT
+            notes TEXT,
+            employee_mode_feature_enabled INTEGER NOT NULL DEFAULT 0,
+            employee_mode_active INTEGER NOT NULL DEFAULT 0,
+            employee_mode_password_hash TEXT
         )
     """)
+
+    # Safe upgrades for controller databases created by older Easy_Sales versions.
+    _ensure_column(cur, "stores", "employee_mode_feature_enabled", "INTEGER NOT NULL DEFAULT 0")
+    _ensure_column(cur, "stores", "employee_mode_active", "INTEGER NOT NULL DEFAULT 0")
+    _ensure_column(cur, "stores", "employee_mode_password_hash", "TEXT")
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS store_activity (
@@ -299,6 +319,133 @@ def update_store_name(store_id, store_name):
         now()
     ))
 
+    conn.commit()
+    conn.close()
+
+
+# ============================================================
+# EMPLOYEE MODE ADD-ON / PASSWORD CONTROL
+# ============================================================
+
+def get_employee_mode_config(store_id):
+    """Return the Employee Mode add-on configuration for one store."""
+    store_id = str(store_id).strip().upper()
+    conn = get_connection()
+    try:
+        row = conn.execute("""
+            SELECT employee_mode_feature_enabled,
+                   employee_mode_active,
+                   employee_mode_password_hash
+            FROM stores
+            WHERE store_id=?
+        """, (store_id,)).fetchone()
+        if row is None:
+            raise ValueError("Store not found.")
+        return {
+            "feature_enabled": bool(row["employee_mode_feature_enabled"]),
+            "active": bool(row["employee_mode_active"]),
+            "password_configured": bool(row["employee_mode_password_hash"]),
+            "password_hash": row["employee_mode_password_hash"]
+        }
+    finally:
+        conn.close()
+
+
+def set_employee_mode_feature(store_id, enabled):
+    """Enable/disable the Employee Mode paid/requested add-on for one store."""
+    store_id = str(store_id).strip().upper()
+    enabled = 1 if enabled else 0
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        UPDATE stores
+        SET employee_mode_feature_enabled=?,
+            employee_mode_active=CASE WHEN ?=0 THEN 0 ELSE employee_mode_active END
+        WHERE store_id=?
+    """, (enabled, enabled, store_id))
+    if cur.rowcount == 0:
+        conn.close()
+        raise ValueError("Store not found.")
+    cur.execute("""
+        INSERT INTO store_activity (store_id, action, description, created_at)
+        VALUES (?, ?, ?, ?)
+    """, (
+        store_id,
+        "EMPLOYEE_MODE_ADDON_ENABLED" if enabled else "EMPLOYEE_MODE_ADDON_DISABLED",
+        "Employee Mode add-on enabled by controller." if enabled else "Employee Mode add-on disabled by controller.",
+        now()
+    ))
+    conn.commit()
+    conn.close()
+
+
+def set_employee_mode_password(store_id, password):
+    """Set the store-specific Employee Mode password as a one-way hash."""
+    store_id = str(store_id).strip().upper()
+    password = str(password or "")
+    if len(password) < 4:
+        raise ValueError("Employee Mode password must be at least 4 characters.")
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        UPDATE stores
+        SET employee_mode_password_hash=?, employee_mode_active=0
+        WHERE store_id=?
+    """, (generate_password_hash(password), store_id))
+    if cur.rowcount == 0:
+        conn.close()
+        raise ValueError("Store not found.")
+    cur.execute("""
+        INSERT INTO store_activity (store_id, action, description, created_at)
+        VALUES (?, ?, ?, ?)
+    """, (store_id, "EMPLOYEE_MODE_PASSWORD_SET", "Employee Mode password set/reset.", now()))
+    conn.commit()
+    conn.close()
+
+
+def reset_employee_mode_password(store_id):
+    """Clear the store's Employee Mode password so the setup popup appears again."""
+    store_id = str(store_id).strip().upper()
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        UPDATE stores
+        SET employee_mode_password_hash=NULL, employee_mode_active=0
+        WHERE store_id=?
+    """, (store_id,))
+    if cur.rowcount == 0:
+        conn.close()
+        raise ValueError("Store not found.")
+    cur.execute("""
+        INSERT INTO store_activity (store_id, action, description, created_at)
+        VALUES (?, ?, ?, ?)
+    """, (store_id, "EMPLOYEE_MODE_PASSWORD_RESET", "Employee Mode password cleared; store must create a new password.", now()))
+    conn.commit()
+    conn.close()
+
+
+def set_employee_mode_active(store_id, active):
+    """Persist the current Employee/Owner mode for a store."""
+    store_id = str(store_id).strip().upper()
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        UPDATE stores
+        SET employee_mode_active=?
+        WHERE store_id=? AND employee_mode_feature_enabled=1 AND employee_mode_password_hash IS NOT NULL
+    """, (1 if active else 0, store_id))
+    if cur.rowcount == 0:
+        conn.close()
+        raise ValueError("Employee Mode is not configured for this store.")
+    cur.execute("""
+        INSERT INTO store_activity (store_id, action, description, created_at)
+        VALUES (?, ?, ?, ?)
+    """, (
+        store_id,
+        "EMPLOYEE_MODE_ON" if active else "OWNER_MODE_RESTORED",
+        "Employee Mode enabled." if active else "Owner Mode restored.",
+        now()
+    ))
     conn.commit()
     conn.close()
 
