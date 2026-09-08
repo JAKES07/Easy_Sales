@@ -3290,3 +3290,38 @@ button:active {
 .receipt-document-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
 .receipt-document-actions button{border:0;border-radius:9px;padding:11px 8px;background:#222;color:#fff;font-weight:700;cursor:pointer;}
 @media(max-width:520px){.receipt-document-actions{grid-template-columns:1fr;}}
+
+/* ============================================================
+   SEPARATE TOP SCANNERS
+   ============================================================ */
+.top-left-scanner {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    z-index: 20;
+    padding: 10px 14px;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0,0,0,.18);
+}
+.top-right-scanner {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 20;
+    padding: 10px 14px;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0,0,0,.18);
+}
+.top-left-scanner:active, .top-right-scanner:active { transform: scale(.96); }
+@media (max-width: 600px) {
+    .top-left-scanner, .top-right-scanner { font-size: 11px; padding: 8px 9px; }
+}
+
