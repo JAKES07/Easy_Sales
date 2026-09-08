@@ -11,8 +11,24 @@ def now():
     return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
 def enabled(store_id):
-    store = get_store(store_id)
-    return bool(store and store.get('restaurant_mode_enabled'))
+    """Return whether the Restaurant add-on is enabled for this store.
+
+    sqlite3.Row does not provide dict.get(), so read the controller
+    column explicitly. This is important because the POS status endpoint
+    uses this function to decide whether the Restaurant button is shown.
+    """
+    sid = str(store_id or '').strip().upper()
+    if not sid:
+        return False
+
+    store = get_store(sid)
+    if store is None:
+        return False
+
+    try:
+        return bool(store['restaurant_mode_enabled'])
+    except (KeyError, IndexError):
+        return False
 
 def conn(store_id):
     if not enabled(store_id):
@@ -121,9 +137,35 @@ def build_menu(c, row):
 
 @restaurant_bp.route('/api/restaurant/status')
 def restaurant_status():
+    """Return the Restaurant add-on state for the logged-in store.
+
+    The browser must never be able to enable the feature itself; the
+    Controller remains the authority. The POS only reads the current state.
+    """
     from flask import session
-    sid=str(session.get('store_id') or request.args.get('store_id') or '').upper()
-    return jsonify({'success':True,'enabled':bool(sid and enabled(sid))})
+
+    sid = str(session.get('store_id') or '').strip().upper()
+
+    if not sid:
+        return jsonify({
+            'success': False,
+            'enabled': False,
+            'message': 'Store access is required.'
+        }), 401
+
+    store = get_store(sid)
+
+    if store is None:
+        return jsonify({
+            'success': False,
+            'enabled': False,
+            'message': 'Store not found.'
+        }), 404
+
+    return jsonify({
+        'success': True,
+        'enabled': bool(store['restaurant_mode_enabled'])
+    })
 
 @restaurant_bp.route('/restaurant')
 def owner_page():
