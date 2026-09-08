@@ -119,6 +119,39 @@
             color: #b42318;
             font-weight: bold;
         }
+
+        .feature-box {
+            margin-top: 10px;
+            padding: 18px;
+            background: #f8fafc;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+        }
+
+        .feature-status {
+            font-weight: bold;
+            margin: 8px 0 12px;
+        }
+
+        .btn-feature {
+            border: none;
+            padding: 12px 16px;
+            border-radius: 7px;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 4px 6px 4px 0;
+        }
+
+        .btn-enable-feature { background: #16803c; }
+        .btn-disable-feature { background: #b42318; }
+        .btn-reset-feature { background: #d98a00; }
+
+        .feature-note {
+            color: #666;
+            font-size: 13px;
+            line-height: 1.45;
+        }
     </style>
 </head>
 
@@ -156,6 +189,36 @@
                     >
                     <button type="submit" class="btn-save">💾 Save Store Name</button>
                 </form>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="label">EMPLOYEE MODE ADD-ON</div>
+            <div class="feature-box">
+                {% if store["employee_mode_feature_enabled"] %}
+                    <div class="feature-status active">● ENABLED FOR THIS STORE</div>
+                    <p class="feature-note">The client requested Employee Mode and Easy_Sales has activated the feature. The store will create its own Employee Mode password from the POS. That password is never shown here.</p>
+
+                    {% if store["employee_mode_password_hash"] %}
+                        <p class="feature-note"><strong>Password:</strong> Configured</p>
+                    {% else %}
+                        <p class="feature-note"><strong>Password:</strong> Not configured yet — the setup popup will appear when the store opens.</p>
+                    {% endif %}
+
+                    <form action="{{ url_for('controller.reset_employee_mode_store_password', store_id=store['store_id']) }}" method="POST" style="display:inline;">
+                        <button type="submit" class="btn-feature btn-reset-feature" onclick="return confirm('Reset the Employee Mode password? The store will need to create a new password.');">🔑 Reset Password</button>
+                    </form>
+
+                    <form action="{{ url_for('controller.disable_employee_mode_addon', store_id=store['store_id']) }}" method="POST" style="display:inline;">
+                        <button type="submit" class="btn-feature btn-disable-feature" onclick="return confirm('Disable Employee Mode for this store?');">Disable Add-on</button>
+                    </form>
+                {% else %}
+                    <div class="feature-status inactive">● NOT ENABLED</div>
+                    <p class="feature-note">Employee Mode is an optional store feature. Enable it here only after the client requests it.</p>
+                    <form action="{{ url_for('controller.enable_employee_mode_addon', store_id=store['store_id']) }}" method="POST">
+                        <button type="submit" class="btn-feature btn-enable-feature">🔓 Enable Employee Mode Add-on</button>
+                    </form>
+                {% endif %}
             </div>
         </div>
 
