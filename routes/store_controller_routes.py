@@ -21,6 +21,8 @@ from store_controller import (
     deactivate_store,
     reset_passkey,
     update_store_name,
+    set_employee_mode_feature,
+    reset_employee_mode_password,
 )
 
 from controller_auth import (
@@ -506,6 +508,65 @@ def update_name(store_id):
             store_id=store_id.upper()
         )
     )
+
+
+
+
+# ============================================================
+# EMPLOYEE MODE ADD-ON
+# ============================================================
+
+@controller_bp.route(
+    "/store/<store_id>/employee-mode/enable",
+    methods=["POST"]
+)
+@controller_login_required
+def enable_employee_mode_addon(store_id):
+    try:
+        set_employee_mode_feature(store_id.upper(), True)
+        flash(
+            f"Employee Mode add-on enabled for {store_id.upper()}. "
+            "The store will ask the owner to create its Employee Mode password.",
+            "success"
+        )
+    except Exception as error:
+        flash(str(error), "error")
+    return redirect(url_for("controller.store_details", store_id=store_id.upper()))
+
+
+@controller_bp.route(
+    "/store/<store_id>/employee-mode/disable",
+    methods=["POST"]
+)
+@controller_login_required
+def disable_employee_mode_addon(store_id):
+    try:
+        set_employee_mode_feature(store_id.upper(), False)
+        flash(
+            f"Employee Mode add-on disabled for {store_id.upper()}.",
+            "success"
+        )
+    except Exception as error:
+        flash(str(error), "error")
+    return redirect(url_for("controller.store_details", store_id=store_id.upper()))
+
+
+@controller_bp.route(
+    "/store/<store_id>/employee-mode/reset-password",
+    methods=["POST"]
+)
+@controller_login_required
+def reset_employee_mode_store_password(store_id):
+    try:
+        reset_employee_mode_password(store_id.upper())
+        flash(
+            f"Employee Mode password reset for {store_id.upper()}. "
+            "The setup popup will appear the next time the store is opened.",
+            "success"
+        )
+    except Exception as error:
+        flash(str(error), "error")
+    return redirect(url_for("controller.store_details", store_id=store_id.upper()))
 
 
 # ============================================================
