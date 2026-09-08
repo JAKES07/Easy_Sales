@@ -276,6 +276,7 @@ def create_store_database(store_id):
                 currency_code TEXT,
                 currency_symbol TEXT,
                 currency_name TEXT,
+                employee_mode_password_hash TEXT,
                 updated_at TEXT
             )
         """)
@@ -296,6 +297,13 @@ def create_store_database(store_id):
         """)
 
         # Safe upgrades for older databases.
+        _ensure_column(
+            cursor,
+            "store_settings",
+            "employee_mode_password_hash",
+            "TEXT"
+        )
+
         _ensure_column(
             cursor,
             "products",
