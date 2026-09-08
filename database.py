@@ -613,10 +613,12 @@ def update_product(product_id, name, price, stock):
         connection.close()
 
 
-def complete_sale(cart, payment_method, sale_fee=0.0):
+def complete_sale(cart, payment_method, sale_fee=0.0, sold_at_override=None):
     connection = get_connection()
     cursor = connection.cursor()
-    sold_at = now_string()
+    # Prefer the POS device's local time when supplied by the client.
+    # Fall back to the server clock for non-browser/internal callers.
+    sold_at = str(sold_at_override).strip() if sold_at_override else now_string()
     transaction_id = str(uuid.uuid4())
     total_sale = 0.0
     receipt_items = []
