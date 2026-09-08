@@ -193,7 +193,14 @@
             id="pos-scanner-camera"
             class="scanner-camera">
 
-            <p>Camera scanner will appear here.</p>
+            <video
+                id="pos-scanner-video"
+                autoplay
+                playsinline
+                muted>
+            </video>
+
+            <div class="scanner-line"></div>
 
         </div>
 
@@ -919,7 +926,7 @@
      ======================================================== -->
 
 <script
-    src="{{ url_for('static', filename='js/app.js') }}?v=restaurant-addon-2">
+    src="{{ url_for('static', filename='js/app.js') }}?v=restaurant-addon-3">
 </script>
 
 
