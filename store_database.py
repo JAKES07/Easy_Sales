@@ -282,6 +282,24 @@ def create_store_database(store_id):
         """)
 
         cursor.execute("""
+            CREATE TABLE IF NOT EXISTS receipt_documents (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                transaction_id TEXT NOT NULL UNIQUE,
+                store_name TEXT NOT NULL,
+                sold_at TEXT NOT NULL,
+                payment_method TEXT NOT NULL,
+                subtotal REAL NOT NULL DEFAULT 0,
+                sale_fee REAL NOT NULL DEFAULT 0,
+                total REAL NOT NULL DEFAULT 0,
+                cash_received REAL,
+                change_amount REAL,
+                currency_json TEXT NOT NULL DEFAULT '{}',
+                items_json TEXT NOT NULL DEFAULT '[]',
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS monthly_report_items (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 report_id INTEGER NOT NULL,
@@ -400,6 +418,10 @@ def reset_store_data(store_id):
     cursor = connection.cursor()
 
     try:
+
+        cursor.execute(
+            "DELETE FROM receipt_documents"
+        )
 
         cursor.execute(
             "DELETE FROM monthly_report_items"
