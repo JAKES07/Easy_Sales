@@ -1212,8 +1212,6 @@ function setupButtons() {
         if (lastReceipt) printReceiptToBluetooth(lastReceipt, false);
     });
 
-    const systemPrintButton = document.getElementById("system-print-receipt");
-    if (systemPrintButton) systemPrintButton.addEventListener("click", printReceipt);
 
     const bluetoothPaperSelect = document.getElementById("bluetooth-paper-width");
     if (bluetoothPaperSelect) {
@@ -2105,6 +2103,14 @@ if (stocktakeHistoryTab) {
 }
 
 
+const receiptDocumentsTab =
+    document.getElementById("receipt-documents-tab");
+
+if (receiptDocumentsTab) {
+    receiptDocumentsTab.addEventListener("click", showReceiptDocuments);
+}
+
+
 // ============================================================
 // SET ACTIVE TAB
 // ============================================================
@@ -2184,15 +2190,6 @@ async function showCurrentStockReport() {
                     </p>
                 </div>
 
-                <button
-                    type="button"
-                    class="stock-pdf-button"
-                    onclick="downloadStockReportPDF()">
-
-                    📄 DOWNLOAD PDF
-
-                </button>
-
             </div>
 
         </div>
@@ -2248,15 +2245,6 @@ async function showCurrentStockReport() {
                             Current inventory position
                         </p>
                     </div>
-
-                    <button
-                        type="button"
-                        class="stock-pdf-button"
-                        onclick="downloadStockReportPDF()">
-
-                        📄 DOWNLOAD PDF
-
-                    </button>
 
                 </div>
 
@@ -2410,39 +2398,6 @@ async function showCurrentStockReport() {
 
         `;
 
-    }
-
-}
-
-
-// ============================================================
-// DOWNLOAD COMPLETE STOCK CONTROL PDF
-// ============================================================
-
-async function downloadStockReportPDF() {
-
-    const button = document.querySelector(".stock-pdf-button");
-    const originalText = button ? button.innerHTML : "";
-
-    try {
-        if (button) {
-            button.disabled = true;
-            button.innerHTML = "⏳ GENERATING PDF...";
-        }
-
-        // Use a normal browser navigation to the PDF endpoint.
-        // This is more reliable on Android/Chrome than creating a
-        // synthetic download link for a Flask-generated PDF.
-        const url = "/api/stock-report/pdf?t=" + Date.now();
-        window.location.href = url;
-
-    } catch (error) {
-        console.error("STOCK PDF DOWNLOAD ERROR:", error);
-        alert("Could not download the stock control PDF.");
-        if (button) {
-            button.disabled = false;
-            button.innerHTML = originalText;
-        }
     }
 
 }
@@ -3079,7 +3034,9 @@ async function saveMonthlyReport() {
                         cash_at_hand:
                             cashAtHand,
                         damaged_goods:
-                            damagedGoodsSelection
+                            damagedGoodsSelection,
+                        device_time:
+                            getDeviceLocalDateTime()
                     })
                 }
             );
@@ -4518,6 +4475,83 @@ async function toggleMovementHistory(
 
 
 // ============================================================
+// RECEIPT DOCUMENT ARCHIVE
+// ============================================================
+
+async function showReceiptDocuments() {
+    const content = document.getElementById("stock-report-content");
+    const tab = document.getElementById("receipt-documents-tab");
+    if (!content) return;
+
+    setStockTab(tab);
+    content.innerHTML = `
+        <div class="report-heading">
+            <div>
+                <h3>Receipt Documents</h3>
+                <p>Saved PDF receipts from completed sales. Open or save them to the phone anytime.</p>
+            </div>
+        </div>
+        <p class="report-loading">Loading receipt documents...</p>
+    `;
+
+    try {
+        const response = await fetch("/api/receipt-documents?t=" + Date.now());
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+            throw new Error(data.message || "Could not load receipt documents.");
+        }
+
+        if (!data.receipts || data.receipts.length === 0) {
+            content.innerHTML += `<div class="report-empty">No saved receipt documents yet.</div>`;
+            return;
+        }
+
+        let html = `
+            <div class="receipt-document-list">
+        `;
+        data.receipts.forEach(function(receipt) {
+            const tx = escapeHtml(String(receipt.transaction_id || ""));
+            const date = escapeHtml(String(receipt.sold_at || receipt.created_at || ""));
+            const payment = escapeHtml(String(receipt.payment_method || "").toUpperCase());
+            const total = formatArchivedMoney(receipt.total, receipt.currency);
+            const itemCount = Array.isArray(receipt.items) ? receipt.items.reduce(function(sum, item) { return sum + Number(item.quantity || 0); }, 0) : 0;
+            const urlBase = "/api/receipt-documents/" + encodeURIComponent(String(receipt.transaction_id || "")) + "/pdf";
+            html += `
+                <div class="receipt-document-card">
+                    <div class="receipt-document-header">
+                        <div>
+                            <strong>Receipt #${tx.slice(0, 18)}</strong>
+                            <span>${date}</span>
+                        </div>
+                        <strong>${escapeHtml(total)}</strong>
+                    </div>
+                    <div class="receipt-document-meta">
+                        <span>Payment: ${payment}</span>
+                        <span>Items: ${itemCount}</span>
+                    </div>
+                    <div class="receipt-document-actions">
+                        <button type="button" onclick="window.open('${urlBase}', '_blank')">📄 VIEW PDF</button>
+                        <button type="button" onclick="window.location.href='${urlBase}?download=1'">💾 SAVE PDF</button>
+                    </div>
+                </div>
+            `;
+        });
+        html += `</div>`;
+        content.innerHTML = html;
+    } catch (error) {
+        console.error("RECEIPT DOCUMENTS ERROR:", error);
+        content.innerHTML = `<div class="report-error">Could not load receipt documents.</div>`;
+    }
+}
+
+function formatArchivedMoney(value, currency) {
+    const c = currency || {};
+    const symbol = c.currency_symbol || c.symbol || storeCurrency.symbol || "";
+    return symbol + Number(value || 0).toFixed(2);
+}
+
+
+// ============================================================
 // 24. STOCKTAKE HISTORY
 // ============================================================
 
@@ -5074,6 +5108,15 @@ async function completeSale() {
 
                         sale_fee:
                             getSaleFee(),
+
+                        cash_received:
+                            selectedPaymentMethod === "cash"
+                                ? (parseFloat(document.getElementById("cash-received")?.value) || 0)
+                                : null,
+                        change:
+                            selectedPaymentMethod === "cash"
+                                ? Math.max(0, (parseFloat(document.getElementById("cash-received")?.value) || 0) - getCheckoutTotal())
+                                : null,
 
                         // Use the phone/tablet's local system clock.
                         sold_at: getDeviceLocalDateTime()
