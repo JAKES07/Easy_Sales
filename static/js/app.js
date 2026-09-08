@@ -1424,8 +1424,7 @@ async function openAddProductBarcodeScanner() {
             "code_128",
             "code_39",
             "upc_a",
-            "upc_e",
-            "qr_code"
+            "upc_e"
         ];
 
         const formats = wantedFormats.filter(function(format) {
@@ -5859,6 +5858,109 @@ setTimeout(
     1500
 );
 /* ============================================================
+   RECEIPT QR SCANNER — SEPARATE FROM PRODUCT BARCODE SCANNER
+   ============================================================ */
+const receiptQrScannerButton = document.getElementById("receipt-qr-scanner-button");
+const receiptQrScannerWindow = document.getElementById("receipt-qr-scanner-window");
+const closeReceiptQrScannerButton = document.getElementById("close-receipt-qr-scanner");
+const receiptQrScannerVideo = document.getElementById("receipt-qr-scanner-video");
+const receiptQrScannerStatus = document.getElementById("receipt-qr-scanner-status");
+let receiptQrScannerStream = null;
+let receiptQrDetector = null;
+let receiptQrScannerRunning = false;
+let receiptQrDetected = false;
+
+async function openReceiptQrScanner() {
+    if (!receiptQrScannerWindow || !receiptQrScannerVideo || !receiptQrScannerStatus) return;
+    receiptQrDetected = false;
+    receiptQrScannerRunning = false;
+    receiptQrScannerWindow.classList.add("show");
+    receiptQrScannerStatus.textContent = "Opening camera...";
+    try {
+        receiptQrScannerStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+            audio: false
+        });
+        receiptQrScannerVideo.srcObject = receiptQrScannerStream;
+        await new Promise(resolve => {
+            if (receiptQrScannerVideo.readyState >= HTMLMediaElement.HAVE_METADATA) resolve();
+            else receiptQrScannerVideo.onloadedmetadata = resolve;
+        });
+        await receiptQrScannerVideo.play();
+        if (!("BarcodeDetector" in window)) {
+            receiptQrScannerStatus.textContent = "QR scanning is not supported by this browser.";
+            return;
+        }
+        const supported = await BarcodeDetector.getSupportedFormats();
+        if (!supported.includes("qr_code")) {
+            receiptQrScannerStatus.textContent = "This browser does not support QR code scanning.";
+            return;
+        }
+        receiptQrDetector = new BarcodeDetector({formats:["qr_code"]});
+        receiptQrScannerRunning = true;
+        receiptQrScannerStatus.textContent = "Scanning receipt QR...";
+        scanReceiptQr();
+    } catch (error) {
+        console.error("Receipt QR scanner error:", error);
+        receiptQrScannerStatus.textContent = "Scanner error: " + error.message;
+    }
+}
+
+async function scanReceiptQr() {
+    if (!receiptQrScannerRunning || receiptQrDetected) return;
+    if (receiptQrScannerVideo.readyState < HTMLMediaElement.HAVE_ENOUGH_DATA) {
+        requestAnimationFrame(scanReceiptQr);
+        return;
+    }
+    try {
+        const codes = await receiptQrDetector.detect(receiptQrScannerVideo);
+        if (codes.length) {
+            const value = String(codes[0].rawValue || "").trim();
+            receiptQrDetected = true;
+            if (!value.startsWith("ESQR:")) {
+                receiptQrScannerStatus.textContent = "That is not an Easy_Sales receipt QR code. Try again.";
+                receiptQrDetected = false;
+                setTimeout(() => { if (receiptQrScannerRunning) requestAnimationFrame(scanReceiptQr); }, 900);
+                return;
+            }
+            const token = value.slice(5).trim();
+            receiptQrScannerStatus.textContent = "Loading receipt...";
+            const response = await fetch("/api/receipt/lookup/" + encodeURIComponent(token), {cache:"no-store"});
+            const data = await response.json();
+            if (response.ok && data.success && data.receipt) {
+                closeReceiptQrScanner();
+                openWarrantyReceipt(data.receipt, data.claims || []);
+                return;
+            }
+            receiptQrScannerStatus.textContent = data.error || "Receipt not found.";
+            receiptQrDetected = false;
+            setTimeout(() => { if (receiptQrScannerRunning) requestAnimationFrame(scanReceiptQr); }, 1200);
+        }
+    } catch (error) {
+        console.error("Receipt QR detection error:", error);
+        receiptQrDetected = false;
+    }
+    if (receiptQrScannerRunning && !receiptQrDetected) requestAnimationFrame(scanReceiptQr);
+}
+
+function closeReceiptQrScanner() {
+    receiptQrScannerRunning = false;
+    receiptQrDetected = false;
+    if (receiptQrScannerStream) {
+        receiptQrScannerStream.getTracks().forEach(track => track.stop());
+        receiptQrScannerStream = null;
+    }
+    if (receiptQrScannerVideo) {
+        receiptQrScannerVideo.pause();
+        receiptQrScannerVideo.srcObject = null;
+    }
+    if (receiptQrScannerWindow) receiptQrScannerWindow.classList.remove("show");
+}
+
+if (receiptQrScannerButton) receiptQrScannerButton.addEventListener("click", openReceiptQrScanner);
+if (closeReceiptQrScannerButton) closeReceiptQrScannerButton.addEventListener("click", closeReceiptQrScanner);
+
+/* ============================================================
    POS BARCODE SCANNER
    ============================================================ */
 
@@ -6076,7 +6178,7 @@ async function scanBarcode() {
 
 
             scannerStatus.textContent =
-                "Checking receipt QR / product barcode...";
+                "Checking product barcode...";
 
 
             console.log(
@@ -6086,19 +6188,6 @@ async function scanBarcode() {
 
 
             try {
-                if (barcode.indexOf("ESQR:") === 0) {
-                    const token = barcode.slice(5).trim();
-                    const qrResponse = await fetch("/api/receipt/lookup/" + encodeURIComponent(token), {cache:"no-store"});
-                    const qrData = await qrResponse.json();
-                    if (qrResponse.ok && qrData.success && qrData.receipt) {
-                        scannerRunning = false;
-                        if (scannerStream) { scannerStream.getTracks().forEach(t=>t.stop()); scannerStream=null; }
-                        closeScanner();
-                        openWarrantyReceipt(qrData.receipt, qrData.claims || []);
-                        return;
-                    }
-                }
-
                 const response =
                     await fetch(
                         "/api/products/barcode/" +
