@@ -53,12 +53,16 @@ from database import (
     get_connection,
     get_currency_settings,
     set_currency_settings,
-    SUPPORTED_CURRENCIES,
-    get_employee_mode_password_hash,
-    set_employee_mode_password_hash
+    SUPPORTED_CURRENCIES
 )
 
-from store_controller import init_controller, get_store
+from store_controller import (
+    init_controller,
+    get_store,
+    get_employee_mode_config,
+    set_employee_mode_password,
+    set_employee_mode_active,
+)
 from store_database import get_live_data_dir
 
 from routes.store_access import store_access_bp
@@ -141,8 +145,32 @@ app.config["SESSION_COOKIE_SECURE"] = (
 # EMPLOYEE MODE SECURITY
 # ============================================================
 
+def current_store_id_for_employee_mode():
+    return str(session.get("store_id") or "").strip().upper() or None
+
+
+def get_current_employee_mode_config():
+    store_id = current_store_id_for_employee_mode()
+    if not store_id:
+        return {
+            "feature_enabled": False,
+            "active": False,
+            "password_configured": False,
+            "password_hash": None
+        }
+    try:
+        return get_employee_mode_config(store_id)
+    except Exception:
+        return {
+            "feature_enabled": False,
+            "active": False,
+            "password_configured": False,
+            "password_hash": None
+        }
+
+
 def employee_mode_is_on():
-    return bool(session.get("employee_mode", False))
+    return bool(get_current_employee_mode_config().get("active"))
 
 
 def employee_restricted_response():
@@ -180,17 +208,26 @@ def enforce_employee_mode_restrictions():
 
 @app.route("/api/employee-mode/status", methods=["GET"])
 def employee_mode_status():
-    password_hash = get_employee_mode_password_hash()
+    config = get_current_employee_mode_config()
     return jsonify({
         "success": True,
-        "employee_mode": employee_mode_is_on(),
-        "password_configured": bool(password_hash)
+        "feature_enabled": config["feature_enabled"],
+        "employee_mode": config["active"] if config["feature_enabled"] else False,
+        "password_configured": config["password_configured"] if config["feature_enabled"] else False
     })
 
 
 @app.route("/api/employee-mode/password", methods=["POST"])
 def configure_employee_mode_password():
-    if employee_mode_is_on():
+    config = get_current_employee_mode_config()
+    if not config["feature_enabled"]:
+        return jsonify({
+            "success": False,
+            "code": "EMPLOYEE_MODE_NOT_ENABLED",
+            "message": "Employee Mode has not been enabled for this store."
+        }), 403
+
+    if config["active"]:
         return employee_restricted_response()
 
     data = request.get_json(silent=True) or {}
@@ -202,39 +239,48 @@ def configure_employee_mode_password():
     if password != confirmation:
         return jsonify({"success": False, "message": "The passwords do not match."}), 400
 
-    set_employee_mode_password_hash(generate_password_hash(password))
+    set_employee_mode_password(current_store_id_for_employee_mode(), password)
     return jsonify({"success": True, "message": "Employee Mode password saved."})
 
 
 @app.route("/api/employee-mode/toggle", methods=["POST"])
 def toggle_employee_mode():
-    data = request.get_json(silent=True) or {}
-    password = str(data.get("password", ""))
-    password_hash = get_employee_mode_password_hash()
+    store_id = current_store_id_for_employee_mode()
+    config = get_current_employee_mode_config()
 
-    if not password_hash:
+    if not config["feature_enabled"]:
+        return jsonify({
+            "success": False,
+            "code": "EMPLOYEE_MODE_NOT_ENABLED",
+            "message": "Employee Mode has not been enabled for this store."
+        }), 403
+
+    if not config["password_configured"]:
         return jsonify({
             "success": False,
             "code": "PASSWORD_NOT_CONFIGURED",
             "message": "Create an Employee Mode password first."
         }), 400
 
-    if not check_password_hash(password_hash, password):
+    data = request.get_json(silent=True) or {}
+    password = str(data.get("password", ""))
+
+    if not check_password_hash(config["password_hash"], password):
         return jsonify({
             "success": False,
             "code": "INVALID_EMPLOYEE_MODE_PASSWORD",
             "message": "Incorrect Employee Mode password."
         }), 401
 
-    new_state = not employee_mode_is_on()
-    session["employee_mode"] = new_state
-    session.modified = True
+    new_state = not config["active"]
+    set_employee_mode_active(store_id, new_state)
 
     return jsonify({
         "success": True,
         "employee_mode": new_state,
         "message": "Employee Mode enabled." if new_state else "Owner Mode restored."
     })
+
 
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(
     hours=8
