@@ -18,6 +18,7 @@ from flask import (
 )
 import sqlite3
 from werkzeug.middleware.proxy_fix import ProxyFix
+from werkzeug.security import generate_password_hash, check_password_hash
 
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER
@@ -52,7 +53,9 @@ from database import (
     get_connection,
     get_currency_settings,
     set_currency_settings,
-    SUPPORTED_CURRENCIES
+    SUPPORTED_CURRENCIES,
+    get_employee_mode_password_hash,
+    set_employee_mode_password_hash
 )
 
 from store_controller import init_controller, get_store
@@ -132,6 +135,106 @@ app.config["SESSION_COOKIE_SECURE"] = (
         "0"
     ) == "1"
 )
+
+
+# ============================================================
+# EMPLOYEE MODE SECURITY
+# ============================================================
+
+def employee_mode_is_on():
+    return bool(session.get("employee_mode", False))
+
+
+def employee_restricted_response():
+    return jsonify({
+        "success": False,
+        "code": "EMPLOYEE_MODE_RESTRICTED",
+        "message": "This owner function is locked while Employee Mode is active."
+    }), 403
+
+
+@app.before_request
+def enforce_employee_mode_restrictions():
+    if not employee_mode_is_on():
+        return None
+
+    path = request.path.rstrip("/")
+    method = request.method.upper()
+
+    restricted = (
+        (path == "/api/products" and method == "POST") or
+        (path.startswith("/api/products/") and method in {"PUT", "DELETE"}) or
+        (path.startswith("/api/products/") and path.endswith("/remove") and method == "POST") or
+        (path in {"/api/stock/add", "/api/stock/remove", "/api/stocktake/record"} and method == "POST") or
+        (path.startswith("/api/stocktake") and method != "OPTIONS") or
+        (path.startswith("/api/stock-movements") and method != "OPTIONS") or
+        (path.startswith("/api/stocktake-history") and method != "OPTIONS") or
+        (path.startswith("/api/stock-report") and method != "OPTIONS") or
+        (path == "/api/settings/currency" and method == "POST")
+    )
+
+    if restricted:
+        return employee_restricted_response()
+    return None
+
+
+@app.route("/api/employee-mode/status", methods=["GET"])
+def employee_mode_status():
+    password_hash = get_employee_mode_password_hash()
+    return jsonify({
+        "success": True,
+        "employee_mode": employee_mode_is_on(),
+        "password_configured": bool(password_hash)
+    })
+
+
+@app.route("/api/employee-mode/password", methods=["POST"])
+def configure_employee_mode_password():
+    if employee_mode_is_on():
+        return employee_restricted_response()
+
+    data = request.get_json(silent=True) or {}
+    password = str(data.get("password", ""))
+    confirmation = str(data.get("confirmation", ""))
+
+    if len(password) < 4:
+        return jsonify({"success": False, "message": "Employee Mode password must be at least 4 characters."}), 400
+    if password != confirmation:
+        return jsonify({"success": False, "message": "The passwords do not match."}), 400
+
+    set_employee_mode_password_hash(generate_password_hash(password))
+    return jsonify({"success": True, "message": "Employee Mode password saved."})
+
+
+@app.route("/api/employee-mode/toggle", methods=["POST"])
+def toggle_employee_mode():
+    data = request.get_json(silent=True) or {}
+    password = str(data.get("password", ""))
+    password_hash = get_employee_mode_password_hash()
+
+    if not password_hash:
+        return jsonify({
+            "success": False,
+            "code": "PASSWORD_NOT_CONFIGURED",
+            "message": "Create an Employee Mode password first."
+        }), 400
+
+    if not check_password_hash(password_hash, password):
+        return jsonify({
+            "success": False,
+            "code": "INVALID_EMPLOYEE_MODE_PASSWORD",
+            "message": "Incorrect Employee Mode password."
+        }), 401
+
+    new_state = not employee_mode_is_on()
+    session["employee_mode"] = new_state
+    session.modified = True
+
+    return jsonify({
+        "success": True,
+        "employee_mode": new_state,
+        "message": "Employee Mode enabled." if new_state else "Owner Mode restored."
+    })
 
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(
     hours=8
