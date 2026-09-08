@@ -223,6 +223,25 @@
         </div>
 
         <div class="row">
+            <div class="label">RESTAURANT POS ADD-ON</div>
+            <div class="feature-box">
+                {% if store["restaurant_mode_enabled"] %}
+                    <div class="feature-status active">● ENABLED FOR THIS STORE</div>
+                    <p class="feature-note">The Restaurant button will appear on the store POS. The restaurant keeps its own menus, ingredient stock, recipes, orders, sales and reports.</p>
+                    <form action="{{ url_for('controller.disable_restaurant_addon', store_id=store['store_id']) }}" method="POST" style="display:inline;">
+                        <button type="submit" class="btn-feature btn-disable-feature" onclick="return confirm('Disable the Restaurant add-on for this store?');">Disable Restaurant Add-on</button>
+                    </form>
+                {% else %}
+                    <div class="feature-status inactive">● NOT ENABLED</div>
+                    <p class="feature-note">Enable this optional add-on when the business wants a separate restaurant system.</p>
+                    <form action="{{ url_for('controller.enable_restaurant_addon', store_id=store['store_id']) }}" method="POST">
+                        <button type="submit" class="btn-feature btn-enable-feature">🍔 Enable Restaurant Add-on</button>
+                    </form>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="row">
             <div class="label">STORE ID</div>
             <div class="value">{{ store["store_id"] }}</div>
         </div>
