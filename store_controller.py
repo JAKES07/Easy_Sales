@@ -161,7 +161,8 @@ def init_controller():
             notes TEXT,
             employee_mode_feature_enabled INTEGER NOT NULL DEFAULT 0,
             employee_mode_active INTEGER NOT NULL DEFAULT 0,
-            employee_mode_password_hash TEXT
+            employee_mode_password_hash TEXT,
+            restaurant_mode_enabled INTEGER NOT NULL DEFAULT 0
         )
     """)
 
@@ -169,6 +170,7 @@ def init_controller():
     _ensure_column(cur, "stores", "employee_mode_feature_enabled", "INTEGER NOT NULL DEFAULT 0")
     _ensure_column(cur, "stores", "employee_mode_active", "INTEGER NOT NULL DEFAULT 0")
     _ensure_column(cur, "stores", "employee_mode_password_hash", "TEXT")
+    _ensure_column(cur, "stores", "restaurant_mode_enabled", "INTEGER NOT NULL DEFAULT 0")
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS store_activity (
@@ -781,3 +783,23 @@ if __name__ == "__main__":
     print(
         f"Starting store spaces: {STARTING_STORE_COUNT}"
     )
+
+
+# ============================================================
+# RESTAURANT ADD-ON
+# ============================================================
+def get_restaurant_mode(store_id):
+    conn = get_connection(); row = conn.execute("SELECT restaurant_mode_enabled FROM stores WHERE store_id=?", (str(store_id).upper(),)).fetchone(); conn.close()
+    return bool(row and row[0])
+
+def set_restaurant_mode(store_id, enabled):
+    sid=str(store_id).upper(); conn=get_connection();
+    conn.execute("UPDATE stores SET restaurant_mode_enabled=? WHERE store_id=?", (1 if enabled else 0, sid))
+    conn.execute("INSERT INTO store_activity(store_id,action,description,created_at) VALUES(?,?,?,?,?)".replace('VALUES(?,?,?,?,?)','VALUES(?,?,?,?)'), (sid, "RESTAURANT_ADDON_ENABLED" if enabled else "RESTAURANT_ADDON_DISABLED", "Restaurant add-on " + ("enabled" if enabled else "disabled"), datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+    conn.commit(); conn.close()
+    if enabled:
+        try:
+            from restaurant import init_restaurant_db
+            init_restaurant_db(sid)
+        except Exception:
+            pass
