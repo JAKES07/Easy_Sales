@@ -6259,12 +6259,27 @@ async function shareReceipt() {
 (async function setupRestaurantButton(){
     const button=document.getElementById('restaurant-button');
     if(!button) return;
+
+    // Hidden by default. The Controller/database is the only authority
+    // that can make this feature visible for a store.
+    button.style.display='none';
+
     try{
-        const response=await fetch('/api/restaurant/status?ts='+Date.now(),{cache:'no-store'});
+        const response=await fetch('/api/restaurant/status?ts='+Date.now(),{
+            method:'GET',
+            cache:'no-store',
+            headers:{'Cache-Control':'no-cache'}
+        });
         const data=await response.json();
-        if(response.ok && data.success && data.enabled){
+
+        if(response.ok && data.success && data.enabled === true){
             button.style.display='inline-flex';
-            button.addEventListener('click',()=>{ window.location.href='/restaurant'; });
+            button.onclick=()=>{ window.location.href='/restaurant'; };
+        } else {
+            button.style.display='none';
         }
-    }catch(error){ console.error('Restaurant add-on status error:',error); }
+    }catch(error){
+        button.style.display='none';
+        console.error('Restaurant add-on status error:',error);
+    }
 })();
