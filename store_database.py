@@ -450,6 +450,20 @@ def reset_store_data(store_id):
             "DELETE FROM receipt_documents"
         )
 
+        # Restaurant add-on records are isolated from the main shop records.
+        # A full store reset clears the restaurant world as well.
+        for table in (
+            "restaurant_stock_movements",
+            "restaurant_order_items",
+            "restaurant_orders",
+            "restaurant_recipe_items",
+            "restaurant_menu",
+            "restaurant_ingredients",
+            "restaurant_expenses",
+        ):
+            cursor.execute(f"DELETE FROM {table}")
+
+
         cursor.execute(
             "DELETE FROM monthly_report_items"
         )
