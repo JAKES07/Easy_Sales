@@ -869,10 +869,18 @@ def save_sale():
 
     try:
 
+        # The POS supplies the device's local clock so sales and the
+        # corresponding stock-movement entries use the same local time
+        # shown on the cashier's phone/tablet.
+        device_sold_at = str(
+            data.get("sold_at") or ""
+        ).strip()
+
         result = complete_sale(
             cart,
             payment_method,
-            sale_fee
+            sale_fee,
+            device_sold_at or None
         )
 
         return jsonify({
