@@ -6,6 +6,7 @@ import os
 import sqlite3
 import datetime
 import uuid
+import json
 
 from flask import has_request_context, session
 from store_database import create_store_database, get_store_connection
@@ -1007,7 +1008,7 @@ def get_stocktake_history(product_id=None):
     return [dict(row) for row in rows]
 
 
-def create_monthly_report(cash_at_hand, damaged_goods):
+def create_monthly_report(cash_at_hand, damaged_goods, created_at_override=None):
     cash_at_hand = float(cash_at_hand)
     if cash_at_hand < 0:
         raise ValueError("Cash at hand cannot be negative.")
@@ -1016,8 +1017,8 @@ def create_monthly_report(cash_at_hand, damaged_goods):
     cursor = connection.cursor()
 
     try:
-        report_month = datetime.datetime.now().strftime("%Y-%m")
-        created_at = now_string()
+        created_at = str(created_at_override or now_string()).strip() or now_string()
+        report_month = created_at[:7] if len(created_at) >= 7 else datetime.datetime.now().strftime("%Y-%m")
         damaged_units = 0
         damaged_value = 0.0
         damaged_items = []
@@ -1180,6 +1181,104 @@ def create_monthly_report(cash_at_hand, damaged_goods):
     except Exception:
         connection.rollback()
         raise
+    finally:
+        connection.close()
+
+
+def save_receipt_document(receipt):
+    """Persist a completed receipt so it can be recalled and regenerated as a PDF."""
+    connection = get_connection()
+    try:
+        transaction_id = str(receipt.get("transaction_id") or "").strip()
+        if not transaction_id:
+            raise ValueError("Receipt transaction ID is required.")
+
+        sold_at = str(receipt.get("sold_at") or now_string()).strip()
+        store_name = str(receipt.get("store_name") or "Easy Sales").strip()
+        payment_method = str(receipt.get("payment_method") or "").upper().strip()
+        currency = receipt.get("currency") or {}
+        items = receipt.get("items") or []
+        cash_received = receipt.get("cash_received", None)
+        change_amount = receipt.get("change", None)
+
+        connection.execute("""
+            INSERT OR REPLACE INTO receipt_documents
+            (transaction_id, store_name, sold_at, payment_method,
+             subtotal, sale_fee, total, cash_received, change_amount,
+             currency_json, items_json, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            transaction_id,
+            store_name,
+            sold_at,
+            payment_method,
+            float(receipt.get("subtotal") or 0),
+            float(receipt.get("sale_fee") or 0),
+            float(receipt.get("total") or 0),
+            None if cash_received is None else float(cash_received),
+            None if change_amount is None else float(change_amount),
+            json.dumps(currency, ensure_ascii=False),
+            json.dumps(items, ensure_ascii=False),
+            sold_at
+        ))
+        connection.commit()
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
+
+
+def get_receipt_documents(limit=500):
+    connection = get_connection()
+    try:
+        rows = connection.execute("""
+            SELECT id, transaction_id, store_name, sold_at, payment_method,
+                   subtotal, sale_fee, total, cash_received, change_amount,
+                   currency_json, items_json, created_at
+            FROM receipt_documents
+            ORDER BY id DESC
+            LIMIT ?
+        """, (int(limit),)).fetchall()
+        result = []
+        for row in rows:
+            item = dict(row)
+            try:
+                item["currency"] = json.loads(item.pop("currency_json") or "{}")
+            except Exception:
+                item["currency"] = {}
+            try:
+                item["items"] = json.loads(item.pop("items_json") or "[]")
+            except Exception:
+                item["items"] = []
+            result.append(item)
+        return result
+    finally:
+        connection.close()
+
+
+def get_receipt_document(transaction_id):
+    connection = get_connection()
+    try:
+        row = connection.execute("""
+            SELECT id, transaction_id, store_name, sold_at, payment_method,
+                   subtotal, sale_fee, total, cash_received, change_amount,
+                   currency_json, items_json, created_at
+            FROM receipt_documents
+            WHERE transaction_id = ?
+        """, (str(transaction_id).strip(),)).fetchone()
+        if not row:
+            return None
+        item = dict(row)
+        try:
+            item["currency"] = json.loads(item.pop("currency_json") or "{}")
+        except Exception:
+            item["currency"] = {}
+        try:
+            item["items"] = json.loads(item.pop("items_json") or "[]")
+        except Exception:
+            item["items"] = []
+        return item
     finally:
         connection.close()
 
