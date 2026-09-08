@@ -5073,7 +5073,10 @@ async function completeSale() {
                             selectedPaymentMethod,
 
                         sale_fee:
-                            getSaleFee()
+                            getSaleFee(),
+
+                        // Use the phone/tablet's local system clock.
+                        sold_at: getDeviceLocalDateTime()
 
                     })
 
