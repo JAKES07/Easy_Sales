@@ -5958,7 +5958,18 @@ function closeReceiptQrScanner() {
 }
 
 if (receiptQrScannerButton) receiptQrScannerButton.addEventListener("click", openReceiptQrScanner);
-if (closeReceiptQrScannerButton) closeReceiptQrScannerButton.addEventListener("click", closeReceiptQrScanner);
+if (closeReceiptQrScannerButton) {
+    closeReceiptQrScannerButton.addEventListener("click", function(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        closeReceiptQrScanner();
+    });
+    closeReceiptQrScannerButton.addEventListener("touchend", function(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        closeReceiptQrScanner();
+    }, {passive: false});
+}
 
 /* ============================================================
    POS BARCODE SCANNER
