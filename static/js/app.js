@@ -13,6 +13,8 @@ let bluetoothPrinterDevice = null;
 let bluetoothPrinterCharacteristic = null;
 let bluetoothPrinterService = null;
 let bluetoothPrinterPaperWidth = 58;
+let employeeMode = false;
+let employeeModePasswordConfigured = false;
 
 
 // ============================================================
@@ -44,6 +46,7 @@ document.addEventListener(
             loadProducts();
         });
 
+        initializeEmployeeMode();
         setupButtons();
 
     }
@@ -249,7 +252,7 @@ function displayProducts(products) {
             </div>
 
             <button
-                class="tile-icon-button edit-product-button"
+                class="tile-icon-button edit-product-button employee-owner-control"
                 type="button"
                 title="Edit product"
                 aria-label="Edit ${escapeHtml(product.name)}">
@@ -257,7 +260,7 @@ function displayProducts(products) {
             </button>
 
             <button
-                class="tile-icon-button remove-product-button"
+                class="tile-icon-button remove-product-button employee-owner-control"
                 type="button"
                 title="Remove product tile"
                 aria-label="Remove ${escapeHtml(product.name)}">
@@ -326,6 +329,8 @@ function displayProducts(products) {
 
     });
 
+    applyEmployeeModeUI();
+
 }
 
 
@@ -334,6 +339,11 @@ function displayProducts(products) {
 // ============================================================
 
 async function removeProductTile(product) {
+
+    if (employeeMode) {
+        showMessage("Remove Product is locked while Employee Mode is active.");
+        return;
+    }
 
     if (!product || !product.id) {
         return;
@@ -717,10 +727,176 @@ function updateCartTotal() {
 
 
 // ============================================================
+// EMPLOYEE MODE
+// ============================================================
+
+async function initializeEmployeeMode() {
+    try {
+        const response = await fetch("/api/employee-mode/status?t=" + Date.now());
+        const data = await response.json();
+        if (!response.ok || !data.success) return;
+
+        employeeMode = !!data.employee_mode;
+        employeeModePasswordConfigured = !!data.password_configured;
+        applyEmployeeModeUI();
+    } catch (error) {
+        console.warn("EMPLOYEE MODE STATUS ERROR:", error);
+    }
+}
+
+function applyEmployeeModeUI() {
+    document.body.classList.toggle("employee-mode-active", employeeMode);
+
+    document.querySelectorAll(".employee-owner-control").forEach(function(element) {
+        element.classList.toggle("employee-mode-hidden", employeeMode);
+    });
+
+    document.querySelectorAll(".edit-product-button, .remove-product-button").forEach(function(element) {
+        element.classList.toggle("employee-mode-hidden", employeeMode);
+    });
+
+    const stockWindow = document.getElementById("stock-take-window");
+    if (employeeMode && stockWindow) {
+        stockWindow.classList.remove("show");
+    }
+}
+
+function openEmployeeModeWindow() {
+    const windowElement = document.getElementById("employee-mode-window");
+    const setupFields = document.getElementById("employee-mode-setup-fields");
+    const enterFields = document.getElementById("employee-mode-enter-fields");
+    const title = document.getElementById("employee-mode-title");
+    const subtitle = document.getElementById("employee-mode-subtitle");
+    const message = document.getElementById("employee-mode-message");
+    const confirmButton = document.getElementById("employee-mode-confirm");
+
+    if (!windowElement) return;
+    if (message) message.textContent = "";
+
+    if (!employeeModePasswordConfigured) {
+        if (setupFields) setupFields.style.display = "block";
+        if (enterFields) enterFields.style.display = "none";
+        if (title) title.textContent = "Set Employee Mode Password";
+        if (subtitle) subtitle.textContent = "The owner creates this password once. It protects the owner controls.";
+        if (confirmButton) confirmButton.textContent = "SAVE PASSWORD";
+    } else {
+        if (setupFields) setupFields.style.display = "none";
+        if (enterFields) enterFields.style.display = "block";
+        if (title) title.textContent = "Enter Employee Mode";
+        if (subtitle) subtitle.textContent = "Enter the owner password to hide the owner controls.";
+        if (confirmButton) confirmButton.textContent = "TURN ON EMPLOYEE MODE";
+    }
+
+    windowElement.classList.add("show");
+}
+
+function closeEmployeeModeWindow() {
+    const windowElement = document.getElementById("employee-mode-window");
+    if (windowElement) windowElement.classList.remove("show");
+}
+
+async function confirmEmployeeModeAction() {
+    const message = document.getElementById("employee-mode-message");
+    const button = document.getElementById("employee-mode-confirm");
+
+    if (!employeeModePasswordConfigured) {
+        const password = document.getElementById("employee-mode-password")?.value || "";
+        const confirmation = document.getElementById("employee-mode-password-confirm")?.value || "";
+        if (password.length < 4) {
+            if (message) message.textContent = "Password must be at least 4 characters.";
+            return;
+        }
+        if (password !== confirmation) {
+            if (message) message.textContent = "The passwords do not match.";
+            return;
+        }
+
+        if (button) { button.disabled = true; button.textContent = "SAVING..."; }
+        try {
+            const response = await fetch("/api/employee-mode/password", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ password: password, confirmation: confirmation })
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success) throw new Error(data.message || "Could not save password.");
+            employeeModePasswordConfigured = true;
+            if (message) message.textContent = "Password saved. Enter it again to turn Employee Mode on.";
+            document.getElementById("employee-mode-password").value = "";
+            document.getElementById("employee-mode-password-confirm").value = "";
+            setTimeout(openEmployeeModeWindow, 350);
+        } catch (error) {
+            if (message) message.textContent = error.message;
+        } finally {
+            if (button) { button.disabled = false; button.textContent = "SAVE PASSWORD"; }
+        }
+        return;
+    }
+
+    const password = document.getElementById("employee-mode-enter-password")?.value || "";
+    if (!password) {
+        if (message) message.textContent = "Enter the owner password.";
+        return;
+    }
+
+    if (button) { button.disabled = true; button.textContent = "CHECKING..."; }
+    try {
+        const response = await fetch("/api/employee-mode/toggle", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ password: password })
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) throw new Error(data.message || "Could not change Employee Mode.");
+        employeeMode = !!data.employee_mode;
+        document.getElementById("employee-mode-enter-password").value = "";
+        closeEmployeeModeWindow();
+        applyEmployeeModeUI();
+        if (employeeMode) {
+            showMessage("Employee Mode ON. Owner controls are locked.");
+        } else {
+            showMessage("Owner Mode restored.");
+        }
+    } catch (error) {
+        if (message) message.textContent = error.message;
+    } finally {
+        if (button) button.disabled = false;
+    }
+}
+
+function setupEmployeeModeButtons() {
+    document.getElementById("employee-mode-button")?.addEventListener("click", openEmployeeModeWindow);
+    document.getElementById("close-employee-mode")?.addEventListener("click", closeEmployeeModeWindow);
+    document.getElementById("employee-mode-confirm")?.addEventListener("click", confirmEmployeeModeAction);
+
+    // Owner exit gesture: tap the Easy_Sales logo five times quickly, then
+    // enter the same owner password. The gesture is only a shortcut; the
+    // password remains the real authorization.
+    const logo = document.querySelector(".main-logo");
+    let taps = 0;
+    let resetTimer = null;
+    if (logo) {
+        logo.addEventListener("click", function() {
+            if (!employeeMode) return;
+            taps += 1;
+            clearTimeout(resetTimer);
+            resetTimer = setTimeout(function() { taps = 0; }, 1600);
+            if (taps >= 5) {
+                taps = 0;
+                openEmployeeModeWindow();
+            }
+        });
+    }
+}
+
+
+// ============================================================
 // 12. BUTTON SETUP
 // ============================================================
 
 function setupButtons() {
+
+    setupEmployeeModeButtons();
 
     const cartButton =
         document.getElementById(
@@ -1115,6 +1291,11 @@ function clearCart() {
 
 function openAddProduct() {
 
+    if (employeeMode) {
+        showMessage("Add Product is locked while Employee Mode is active.");
+        return;
+    }
+
     const element =
         document.getElementById(
             "add-product-window"
@@ -1414,6 +1595,11 @@ function closeAddProductBarcodeScanner() {
 
 async function saveProduct() {
 
+    if (employeeMode) {
+        showMessage("Add Product is locked while Employee Mode is active.");
+        return;
+    }
+
     const nameInput =
         document.getElementById(
             "product-name"
@@ -1641,6 +1827,11 @@ async function saveProduct() {
 
 function openStockTake() {
 
+    if (employeeMode) {
+        showMessage("Stock Control is locked while Employee Mode is active.");
+        return;
+    }
+
     const windowElement =
         document.getElementById(
             "stock-take-window"
@@ -1809,6 +2000,11 @@ async function loadStockTake() {
 // ============================================================
 
 function openStockTake() {
+
+    if (employeeMode) {
+        showMessage("Stock Control is locked while Employee Mode is active.");
+        return;
+    }
 
     const stockWindow =
         document.getElementById(
