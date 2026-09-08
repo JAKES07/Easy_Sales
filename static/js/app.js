@@ -5262,6 +5262,30 @@ async function completeSale() {
 
 
 // ============================================================
+// DEVICE LOCAL DATE/TIME
+// ============================================================
+
+function getDeviceLocalDateTime() {
+    const now = new Date();
+
+    const pad = function(value) {
+        return String(value).padStart(2, "0");
+    };
+
+    // Deliberately use the phone/tablet local clock rather than UTC.
+    // Format matches the database/report format: YYYY-MM-DD HH:MM:SS
+    return (
+        now.getFullYear() + "-" +
+        pad(now.getMonth() + 1) + "-" +
+        pad(now.getDate()) + " " +
+        pad(now.getHours()) + ":" +
+        pad(now.getMinutes()) + ":" +
+        pad(now.getSeconds())
+    );
+}
+
+
+// ============================================================
 // 29. PRODUCT SEARCH
 // ============================================================
 
