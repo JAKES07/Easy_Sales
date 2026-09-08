@@ -44,9 +44,10 @@ document.addEventListener(
 
         initializeCurrency().then(function() {
             loadProducts();
+        }).finally(function() {
+            initializeEmployeeMode();
         });
 
-        initializeEmployeeMode();
         setupButtons();
 
     }
@@ -738,7 +739,14 @@ async function initializeEmployeeMode() {
 
         employeeMode = !!data.employee_mode;
         employeeModePasswordConfigured = !!data.password_configured;
+
         applyEmployeeModeUI();
+
+        // The controller activates this add-on per store. The first time
+        // that store opens it must create its own password.
+        if (data.feature_enabled && !data.password_configured) {
+            setTimeout(openEmployeeModeSetupWindow, 250);
+        }
     } catch (error) {
         console.warn("EMPLOYEE MODE STATUS ERROR:", error);
     }
@@ -761,7 +769,7 @@ function applyEmployeeModeUI() {
     }
 }
 
-function openEmployeeModeWindow() {
+function openEmployeeModeSetupWindow() {
     const windowElement = document.getElementById("employee-mode-window");
     const setupFields = document.getElementById("employee-mode-setup-fields");
     const enterFields = document.getElementById("employee-mode-enter-fields");
@@ -771,21 +779,17 @@ function openEmployeeModeWindow() {
     const confirmButton = document.getElementById("employee-mode-confirm");
 
     if (!windowElement) return;
+    if (setupFields) setupFields.style.display = "block";
+    if (enterFields) enterFields.style.display = "none";
+    if (title) title.textContent = "Create Employee Mode Password";
+    if (subtitle) subtitle.textContent = "This password will be used in the POS search bar to switch Employee Mode on or off.";
+    if (confirmButton) confirmButton.textContent = "SAVE PASSWORD";
     if (message) message.textContent = "";
 
-    if (!employeeModePasswordConfigured) {
-        if (setupFields) setupFields.style.display = "block";
-        if (enterFields) enterFields.style.display = "none";
-        if (title) title.textContent = "Set Employee Mode Password";
-        if (subtitle) subtitle.textContent = "The owner creates this password once. It protects the owner controls.";
-        if (confirmButton) confirmButton.textContent = "SAVE PASSWORD";
-    } else {
-        if (setupFields) setupFields.style.display = "none";
-        if (enterFields) enterFields.style.display = "block";
-        if (title) title.textContent = "Enter Employee Mode";
-        if (subtitle) subtitle.textContent = "Enter the owner password to hide the owner controls.";
-        if (confirmButton) confirmButton.textContent = "TURN ON EMPLOYEE MODE";
-    }
+    const password = document.getElementById("employee-mode-password");
+    const confirmation = document.getElementById("employee-mode-password-confirm");
+    if (password) password.value = "";
+    if (confirmation) confirmation.value = "";
 
     windowElement.classList.add("show");
 }
@@ -795,98 +799,100 @@ function closeEmployeeModeWindow() {
     if (windowElement) windowElement.classList.remove("show");
 }
 
-async function confirmEmployeeModeAction() {
+async function saveEmployeeModePassword() {
     const message = document.getElementById("employee-mode-message");
     const button = document.getElementById("employee-mode-confirm");
+    const password = document.getElementById("employee-mode-password")?.value || "";
+    const confirmation = document.getElementById("employee-mode-password-confirm")?.value || "";
 
-    if (!employeeModePasswordConfigured) {
-        const password = document.getElementById("employee-mode-password")?.value || "";
-        const confirmation = document.getElementById("employee-mode-password-confirm")?.value || "";
-        if (password.length < 4) {
-            if (message) message.textContent = "Password must be at least 4 characters.";
-            return;
-        }
-        if (password !== confirmation) {
-            if (message) message.textContent = "The passwords do not match.";
-            return;
-        }
-
-        if (button) { button.disabled = true; button.textContent = "SAVING..."; }
-        try {
-            const response = await fetch("/api/employee-mode/password", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ password: password, confirmation: confirmation })
-            });
-            const data = await response.json();
-            if (!response.ok || !data.success) throw new Error(data.message || "Could not save password.");
-            employeeModePasswordConfigured = true;
-            if (message) message.textContent = "Password saved. Enter it again to turn Employee Mode on.";
-            document.getElementById("employee-mode-password").value = "";
-            document.getElementById("employee-mode-password-confirm").value = "";
-            setTimeout(openEmployeeModeWindow, 350);
-        } catch (error) {
-            if (message) message.textContent = error.message;
-        } finally {
-            if (button) { button.disabled = false; button.textContent = "SAVE PASSWORD"; }
-        }
+    if (password.length < 4) {
+        if (message) message.textContent = "Password must be at least 4 characters.";
+        return;
+    }
+    if (password !== confirmation) {
+        if (message) message.textContent = "The passwords do not match.";
         return;
     }
 
-    const password = document.getElementById("employee-mode-enter-password")?.value || "";
-    if (!password) {
-        if (message) message.textContent = "Enter the owner password.";
-        return;
-    }
-
-    if (button) { button.disabled = true; button.textContent = "CHECKING..."; }
+    if (button) { button.disabled = true; button.textContent = "SAVING..."; }
     try {
-        const response = await fetch("/api/employee-mode/toggle", {
+        const response = await fetch("/api/employee-mode/password", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ password: password })
+            body: JSON.stringify({ password: password, confirmation: confirmation })
         });
         const data = await response.json();
-        if (!response.ok || !data.success) throw new Error(data.message || "Could not change Employee Mode.");
-        employeeMode = !!data.employee_mode;
-        document.getElementById("employee-mode-enter-password").value = "";
+        if (!response.ok || !data.success) throw new Error(data.message || "Could not save password.");
+
+        employeeModePasswordConfigured = true;
         closeEmployeeModeWindow();
-        applyEmployeeModeUI();
-        if (employeeMode) {
-            showMessage("Employee Mode ON. Owner controls are locked.");
-        } else {
-            showMessage("Owner Mode restored.");
-        }
+        showMessage("Employee Mode password created. Type the password in the search bar and press Enter to turn Employee Mode ON.");
     } catch (error) {
         if (message) message.textContent = error.message;
     } finally {
-        if (button) button.disabled = false;
+        if (button) { button.disabled = false; button.textContent = "SAVE PASSWORD"; }
     }
 }
 
-function setupEmployeeModeButtons() {
-    document.getElementById("employee-mode-button")?.addEventListener("click", openEmployeeModeWindow);
-    document.getElementById("close-employee-mode")?.addEventListener("click", closeEmployeeModeWindow);
-    document.getElementById("employee-mode-confirm")?.addEventListener("click", confirmEmployeeModeAction);
+async function toggleEmployeeModeWithPassword(password) {
+    const response = await fetch("/api/employee-mode/toggle", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: password })
+    });
+    const data = await response.json();
 
-    // Owner exit gesture: tap the Easy_Sales logo five times quickly, then
-    // enter the same owner password. The gesture is only a shortcut; the
-    // password remains the real authorization.
-    const logo = document.querySelector(".main-logo");
-    let taps = 0;
-    let resetTimer = null;
-    if (logo) {
-        logo.addEventListener("click", function() {
-            if (!employeeMode) return;
-            taps += 1;
-            clearTimeout(resetTimer);
-            resetTimer = setTimeout(function() { taps = 0; }, 1600);
-            if (taps >= 5) {
-                taps = 0;
-                openEmployeeModeWindow();
-            }
-        });
+    if (!response.ok || !data.success) {
+        throw new Error(data.message || "Could not change Employee Mode.");
     }
+
+    employeeMode = !!data.employee_mode;
+    employeeModePasswordConfigured = true;
+    applyEmployeeModeUI();
+
+    showMessage(
+        employeeMode
+            ? "Employee Mode ON. Owner controls are locked."
+            : "Owner Mode restored."
+    );
+}
+
+function setupEmployeeModeSearch() {
+    const searchInput = document.getElementById("product-search");
+    if (!searchInput) return;
+
+    searchInput.addEventListener("keydown", async function(event) {
+        if (event.key !== "Enter") return;
+
+        const configResponse = await fetch("/api/employee-mode/status?t=" + Date.now());
+        const config = await configResponse.json();
+
+        if (!config.feature_enabled || !config.password_configured) {
+            return;
+        }
+
+        const value = this.value.trim();
+        if (!value) return;
+
+        // Enter is the owner mode switch. Normal product filtering still
+        // happens while typing, so the employee does not need Enter to search.
+        event.preventDefault();
+        try {
+            await toggleEmployeeModeWithPassword(value);
+            this.value = "";
+            this.dispatchEvent(new Event("input", { bubbles: true }));
+        } catch (error) {
+            showMessage("Employee Mode password is incorrect.");
+        }
+    });
+}
+
+function setupEmployeeModeButtons() {
+    // The visible Employee Mode button was intentionally removed.
+    // The search bar + Enter is now the only POS mode switch.
+    document.getElementById("close-employee-mode")?.addEventListener("click", closeEmployeeModeWindow);
+    document.getElementById("employee-mode-confirm")?.addEventListener("click", saveEmployeeModePassword);
+    setupEmployeeModeSearch();
 }
 
 
