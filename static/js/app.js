@@ -1649,8 +1649,9 @@ async function saveProduct() {
 
     const price =
         parseFloat(priceInput.value);
-    let warrantyDays = warrantySelect ? parseInt(warrantySelect.value, 10) : 0;
-    if (warrantySelect && warrantySelect.value === "custom") warrantyDays = parseInt(customWarrantyInput?.value || "0", 10) || 0;
+
+    // Warranty is configured in Edit Product. New products start with no warranty.
+    const warrantyDays = 0;
 
     const stock =
         parseInt(
@@ -1750,7 +1751,9 @@ async function saveProduct() {
 
                         stock: stock,
 
-                        barcode: barcode
+                        barcode: barcode,
+
+                        warranty_days: warrantyDays
 
                     })
 
