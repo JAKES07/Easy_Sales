@@ -53,7 +53,7 @@
     class="top-left-scanner"
     type="button">
 
-    🔳 Scan Receipt QR
+    🔳 QR
 
 </button>
 
@@ -62,7 +62,7 @@
     class="top-right-scanner"
     type="button">
 
-    📷 Scan Product Barcode
+    📷 Scan
 
 </button>
 
@@ -170,7 +170,7 @@
             <h2>Scan Receipt QR</h2>
             <span>Scan the QR code on the receipt for warranty/refund/replacement</span>
         </div>
-        <button id="close-receipt-qr-scanner" type="button">×</button>
+        <button id="close-receipt-qr-scanner" class="scanner-close-button" type="button" aria-label="Exit QR scanner">×</button>
     </div>
     <div class="scanner-content">
         <div class="scanner-camera-box">
@@ -959,7 +959,7 @@
      ======================================================== -->
 
 <script
-    src="{{ url_for('static', filename='js/app.js') }}">
+    src="{{ url_for('static', filename='js/app.js') }}?v=qr-separate-2">
 </script>
 
 
