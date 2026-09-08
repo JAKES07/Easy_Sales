@@ -81,7 +81,8 @@ def store_access_login():
     store = get_store(store_id)
 
     session["store_id"] = store_id
-    session.pop("employee_mode", None)
+    # Employee Mode is stored per store in the controller database,
+    # so logging out and back in does NOT silently switch it off.
     session["store_name"] = store["store_name"]
 
     return jsonify({
