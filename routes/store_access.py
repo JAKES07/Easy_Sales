@@ -81,6 +81,7 @@ def store_access_login():
     store = get_store(store_id)
 
     session["store_id"] = store_id
+session.pop("employee_mode", None)
     session["store_name"] = store["store_name"]
 
     return jsonify({
