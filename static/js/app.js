@@ -1192,7 +1192,10 @@ function setupButtons() {
 
     }
 
-    const closeReceiptButton = document.getElementById("close-receipt");
+    const closeWarrantyButton = document.getElementById("close-warranty-window");
+if(closeWarrantyButton) closeWarrantyButton.addEventListener("click", closeWarrantyReceipt);
+
+const closeReceiptButton = document.getElementById("close-receipt");
     if (closeReceiptButton) closeReceiptButton.addEventListener("click", closeReceipt);
 
     const doneReceiptButton = document.getElementById("done-receipt");
@@ -1421,7 +1424,8 @@ async function openAddProductBarcodeScanner() {
             "code_128",
             "code_39",
             "upc_a",
-            "upc_e"
+            "upc_e",
+            "qr_code"
         ];
 
         const formats = wantedFormats.filter(function(format) {
@@ -1646,6 +1650,8 @@ async function saveProduct() {
 
     const price =
         parseFloat(priceInput.value);
+    let warrantyDays = warrantySelect ? parseInt(warrantySelect.value, 10) : 0;
+    if (warrantySelect && warrantySelect.value === "custom") warrantyDays = parseInt(customWarrantyInput?.value || "0", 10) || 0;
 
     const stock =
         parseInt(
@@ -4528,6 +4534,7 @@ async function showReceiptDocuments() {
                     <div class="receipt-document-meta">
                         <span>Payment: ${payment}</span>
                         <span>Items: ${itemCount}</span>
+                        <span>Status: ${escapeHtml(String(receipt.receipt_status || "COMPLETED"))}</span>
                     </div>
                     <div class="receipt-document-actions">
                         <button type="button" onclick="window.open('${urlBase}', '_blank')">📄 VIEW PDF</button>
@@ -5158,6 +5165,7 @@ async function completeSale() {
             store_name: data.store_name || "Easy Sales",
             sold_at: data.sold_at || new Date().toISOString(),
             transaction_id: data.transaction_id || "",
+            receipt_token: data.receipt_token || "",
             payment_method: completedPaymentMethod,
             subtotal: Number(data.subtotal || 0),
             sale_fee: Number(data.sale_fee || 0),
@@ -5484,6 +5492,8 @@ function openEditProduct(product) {
         document.getElementById(
             "edit-product-stock"
         );
+    const warrantySelect = document.getElementById("edit-product-warranty");
+    const customWarrantyInput = document.getElementById("edit-product-custom-warranty");
 
     if (
         !popup ||
@@ -5503,6 +5513,12 @@ function openEditProduct(product) {
     nameInput.value = product.name;
     priceInput.value = Number(product.price).toFixed(2);
     stockInput.value = product.stock;
+    const warrantyDays = Number(product.warranty_days || 0);
+    if (warrantySelect) {
+        const supported = [0,7,30,90,180,365];
+        warrantySelect.value = supported.includes(warrantyDays) ? String(warrantyDays) : "custom";
+        if (customWarrantyInput) { customWarrantyInput.value = supported.includes(warrantyDays) ? "" : String(warrantyDays || ""); customWarrantyInput.style.display = warrantySelect.value === "custom" ? "block" : "none"; }
+    }
 
     showEditProductMessage("");
 
@@ -5564,6 +5580,8 @@ async function saveEditedProduct() {
         document.getElementById(
             "save-edit-product"
         );
+    const warrantySelect = document.getElementById("edit-product-warranty");
+    const customWarrantyInput = document.getElementById("edit-product-custom-warranty");
 
     if (
         !nameInput ||
@@ -5582,6 +5600,9 @@ async function saveEditedProduct() {
 
     const stock =
         parseInt(stockInput.value, 10);
+    let warrantyDays = warrantySelect ? parseInt(warrantySelect.value, 10) : 0;
+    if (warrantySelect && warrantySelect.value === "custom") warrantyDays = parseInt(customWarrantyInput?.value || "0", 10) || 0;
+    if (warrantyDays < 0) warrantyDays = 0;
 
     if (!name) {
 
@@ -5638,7 +5659,8 @@ async function saveEditedProduct() {
                     body: JSON.stringify({
                         name: name,
                         price: price,
-                        stock: stock
+                        stock: stock,
+                        warranty_days: warrantyDays
                     })
                 }
             );
@@ -5962,7 +5984,8 @@ async function openScanner() {
             "code_128",
             "code_39",
             "upc_a",
-            "upc_e"
+            "upc_e",
+            "qr_code"
         ];
 
 
@@ -6053,7 +6076,7 @@ async function scanBarcode() {
 
 
             scannerStatus.textContent =
-                "Looking for product...";
+                "Checking receipt QR / product barcode...";
 
 
             console.log(
@@ -6063,6 +6086,18 @@ async function scanBarcode() {
 
 
             try {
+                if (barcode.indexOf("ESQR:") === 0) {
+                    const token = barcode.slice(5).trim();
+                    const qrResponse = await fetch("/api/receipt/lookup/" + encodeURIComponent(token), {cache:"no-store"});
+                    const qrData = await qrResponse.json();
+                    if (qrResponse.ok && qrData.success && qrData.receipt) {
+                        scannerRunning = false;
+                        if (scannerStream) { scannerStream.getTracks().forEach(t=>t.stop()); scannerStream=null; }
+                        closeScanner();
+                        openWarrantyReceipt(qrData.receipt, qrData.claims || []);
+                        return;
+                    }
+                }
 
                 const response =
                     await fetch(
@@ -6299,6 +6334,51 @@ if (closeScannerButton) {
 
 
 // ============================================================
+// WARRANTY / RECEIPT QR SERVICE
+// ============================================================
+async function openWarrantyReceipt(receipt, claims) {
+    const win=document.getElementById("warranty-window"), content=document.getElementById("warranty-content");
+    if(!win||!content||!receipt) return;
+    const items=Array.isArray(receipt.items)?receipt.items:[];
+    let html=`<div><strong>Receipt #${escapeReceiptHtml(String(receipt.transaction_id||"").slice(0,18))}</strong><br>${escapeReceiptHtml(receipt.sold_at||"")}</div><hr>`;
+    items.forEach(function(item){
+        const claimed=Number(item.claimed_quantity||0), qty=Number(item.quantity||0), remaining=qty-claimed;
+        const warranty=Number(item.warranty_days||0); const status=item.warranty_status|| (warranty?"ACTIVE":"NO WARRANTY");
+        html+=`<div class="warranty-card" style="border:1px solid #ddd;border-radius:10px;padding:12px;margin:10px 0"><strong>${escapeReceiptHtml(item.name)}</strong><br>Sold: ${escapeReceiptHtml(item.warranty_start||receipt.sold_at||"")}<br>Warranty: ${warranty?warranty+" days":"None"}<br>Expiry: ${escapeReceiptHtml(item.warranty_expiry||"—")}<br>Status: <strong>${escapeReceiptHtml(status)}</strong><br>Claimed: ${claimed} / ${qty}`;
+        if(warranty>0 && remaining>0 && status!=="EXPIRED"){
+            html+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px"><button type="button" onclick="startWarrantyAction('${String(receipt.receipt_token)}',${Number(item.product_id)},${remaining},'REFUND')">REFUND</button><button type="button" onclick="startWarrantyAction('${String(receipt.receipt_token)}',${Number(item.product_id)},${remaining},'REPLACEMENT')">REPLACEMENT</button></div>`;
+        }
+        html+=`</div>`;
+    });
+    if(claims.length) { html+=`<hr><strong>Warranty Actions</strong>`; claims.forEach(c=>html+=`<div style="font-size:12px;margin-top:6px">${escapeReceiptHtml(c.action)} • ${escapeReceiptHtml(c.product_name)} × ${Number(c.quantity)} • ${escapeReceiptHtml(c.action_at)}</div>`); }
+    content.innerHTML=html; win.classList.add("show"); win.setAttribute("aria-hidden","false");
+}
+
+async function startWarrantyAction(token, productId, maxQty, action){
+    let quantity=parseInt(prompt(`Quantity for ${action.toLowerCase()} (1-${maxQty}):`, "1"),10);
+    if(!quantity || quantity<1 || quantity>maxQty){ if(quantity!==null) showMessage("Invalid quantity."); return; }
+    let replacementProductId=null;
+    if(action==="REPLACEMENT"){
+        const productsResponse=await fetch("/api/products?t="+Date.now()); const data=await productsResponse.json();
+        const products=(data.products||[]).filter(p=>Number(p.stock)>0);
+        if(!products.length){showMessage("No replacement stock is available.");return;}
+        const options=products.map((p,i)=>`${i+1}. ${p.name} (stock ${p.stock})`).join("\n");
+        const choice=prompt("Select replacement product number:\n\n"+options,"1"); const idx=parseInt(choice,10)-1;
+        if(!Number.isInteger(idx)||!products[idx]) return; replacementProductId=products[idx].id;
+    }
+    const response=await fetch("/api/receipt/"+encodeURIComponent(token)+"/warranty-claim",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({product_id:productId,quantity,action,replacement_product_id:replacementProductId,device_time:getDeviceLocalDateTime()})});
+    const data=await response.json();
+    if(!response.ok||!data.success){showMessage(data.message||"Warranty action failed.");return;}
+    showMessage(action+" recorded. Saved receipt updated.");
+    lastReceipt = data.receipt;
+    await openWarrantyReceipt(data.receipt,data.claims||[]);
+    showReceipt(data.receipt);
+    if(typeof loadProducts === "function") await loadProducts();
+}
+
+function closeWarrantyReceipt(){const win=document.getElementById("warranty-window");if(win){win.classList.remove("show");win.setAttribute("aria-hidden","true");}}
+
+// ============================================================
 // RECEIPT PREVIEW / PRINT / SHARE
 // ============================================================
 
@@ -6327,15 +6407,18 @@ function buildReceiptHtml(receipt) {
     html += `<div class="receipt-center">RECEIPT</div>`;
     html += `<div class="receipt-center">${escapeReceiptHtml(receipt.sold_at || "")}</div>`;
     if (receipt.transaction_id) html += `<div class="receipt-center">#${escapeReceiptHtml(receipt.transaction_id.slice(0, 12).toUpperCase())}</div>`;
+    if (receipt.receipt_status && receipt.receipt_status !== "COMPLETED") html += `<div class="receipt-center receipt-bold">STATUS: ${escapeReceiptHtml(receipt.receipt_status)}</div>`;
     html += `<div class="receipt-line"></div>`;
     items.forEach(function(item) {
         html += `<div class="receipt-item"><span class="receipt-item-name">${escapeReceiptHtml(item.name)} × ${Number(item.quantity || 0)}</span><span class="receipt-item-total">${receiptMoney(item.line_total, receipt)}</span></div>`;
         html += `<div style="font-size:12px">${receiptMoney(item.unit_price, receipt)} each</div>`;
+        if (Number(item.warranty_days || 0) > 0) { html += `<div style="font-size:11px">Warranty: ${Number(item.warranty_days)} days • Expiry: ${escapeReceiptHtml(item.warranty_expiry || "")} • ${escapeReceiptHtml(item.warranty_status || "ACTIVE")}</div>`; } else if (item.warranty_status) { html += `<div style="font-size:11px">Warranty: ${escapeReceiptHtml(item.warranty_status)}</div>`; }
     });
     html += `<div class="receipt-line"></div>`;
     html += `<div class="receipt-summary-row"><span>Subtotal</span><span>${receiptMoney(receipt.subtotal, receipt)}</span></div>`;
     if (Number(receipt.sale_fee || 0) > 0) html += `<div class="receipt-summary-row"><span>Sale Fee</span><span>${receiptMoney(receipt.sale_fee, receipt)}</span></div>`;
     html += `<div class="receipt-summary-row receipt-bold"><span>TOTAL</span><span>${receiptMoney(receipt.total, receipt)}</span></div>`;
+    if (Number(receipt.refund_total || 0) > 0) html += `<div class="receipt-summary-row"><span>Refunded</span><span>${receiptMoney(receipt.refund_total, receipt)}</span></div>`;
     html += `<div class="receipt-summary-row"><span>Payment</span><span>${escapeReceiptHtml(String(receipt.payment_method || "").toUpperCase())}</span></div>`;
     if (receipt.cash_received !== null && receipt.cash_received !== undefined) {
         html += `<div class="receipt-summary-row"><span>Cash</span><span>${receiptMoney(receipt.cash_received, receipt)}</span></div>`;
@@ -6355,6 +6438,7 @@ function buildReceiptText(receipt) {
     lines.push("RECEIPT");
     lines.push(receipt.sold_at || "");
     if (receipt.transaction_id) lines.push("Receipt #: " + receipt.transaction_id);
+    if (receipt.receipt_token) lines.push("QR: Scan this receipt in Easy_Sales for warranty/refund service.");
     lines.push("------------------------------");
     (receipt.items || []).forEach(function(item) {
         lines.push(`${item.name} x ${item.quantity}  ${currency}${Number(item.line_total || 0).toFixed(2)}`);
@@ -6417,6 +6501,20 @@ function bytesToTextBytes(value) {
     });
 }
 
+function escposQrBytes(data, moduleSize) {
+    const bytes = [];
+    const d = new TextEncoder().encode(String(data || ""));
+    const push = (...a) => bytes.push(...a);
+    const size = Math.max(1, Math.min(16, Number(moduleSize || 5)));
+    push(0x1D,0x28,0x6B,0x04,0x00,0x31,0x41,0x32,0x00); // model 2
+    push(0x1D,0x28,0x6B,0x03,0x00,0x31,0x43,size); // module size
+    push(0x1D,0x28,0x6B,0x03,0x00,0x31,0x45,0x31); // ECC M
+    const len=d.length+3, pL=len&0xFF, pH=(len>>8)&0xFF;
+    push(0x1D,0x28,0x6B,pL,pH,0x31,0x50,0x30,...d); // store
+    push(0x1D,0x28,0x6B,0x03,0x00,0x31,0x51,0x30); // print
+    return bytes;
+}
+
 function escposReceiptBytes(receipt, paperWidth) {
     const width = Number(paperWidth) === 80 ? 48 : 32;
     const currency = (receipt.currency && (receipt.currency.currency_symbol || receipt.currency.symbol)) || storeCurrency.symbol || "";
@@ -6457,6 +6555,12 @@ function escposReceiptBytes(receipt, paperWidth) {
     if (receipt.cash_received !== null && receipt.cash_received !== undefined) {
         right("Cash: ", receipt.cash_received);
         right("Change: ", receipt.change);
+    }
+    if (receipt.receipt_token) {
+        push(ESCPOS.ALIGN_CENTER);
+        lineText("SCAN FOR WARRANTY");
+        push(...escposQrBytes("ESQR:" + receipt.receipt_token, 5));
+        lineText("Scan in Easy_Sales");
     }
     push(ESCPOS.ALIGN_CENTER);
     lineText("Thank you!");
