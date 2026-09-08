@@ -49,11 +49,20 @@
         class="main-logo"
     >
     <button
-    id="scanner-button"
+    id="receipt-qr-scanner-button"
     class="top-left-scanner"
     type="button">
 
-    📷 Scan Receipt / Product
+    🔳 Scan Receipt QR
+
+</button>
+
+<button
+    id="scanner-button"
+    class="top-right-scanner"
+    type="button">
+
+    📷 Scan Product Barcode
 
 </button>
 
@@ -150,6 +159,26 @@
     </footer>
 
 
+</div>
+
+<!-- ========================================================
+     RECEIPT QR SCANNER WINDOW
+     ======================================================== -->
+<div id="receipt-qr-scanner-window" class="scanner-window">
+    <div class="scanner-header">
+        <div>
+            <h2>Scan Receipt QR</h2>
+            <span>Scan the QR code on the receipt for warranty/refund/replacement</span>
+        </div>
+        <button id="close-receipt-qr-scanner" type="button">×</button>
+    </div>
+    <div class="scanner-content">
+        <div class="scanner-camera-box">
+            <video id="receipt-qr-scanner-video" autoplay playsinline></video>
+            <div class="scanner-line"></div>
+        </div>
+        <p id="receipt-qr-scanner-status" class="scanner-status">Opening camera...</p>
+    </div>
 </div>
 
 <!-- ========================================================
@@ -817,7 +846,7 @@
     <div class="scanner-header">
 
         <div>
-            <h2>Scan Product</h2>
+            <h2>Scan Product Barcode</h2>
             <span>Point the camera at a product barcode</span>
         </div>
 
