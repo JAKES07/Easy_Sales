@@ -1192,9 +1192,6 @@ function setupButtons() {
 
     }
 
-    const closeWarrantyButton = document.getElementById("close-warranty-window");
-if(closeWarrantyButton) closeWarrantyButton.addEventListener("click", closeWarrantyReceipt);
-
 const closeReceiptButton = document.getElementById("close-receipt");
     if (closeReceiptButton) closeReceiptButton.addEventListener("click", closeReceipt);
 
@@ -1650,9 +1647,6 @@ async function saveProduct() {
     const price =
         parseFloat(priceInput.value);
 
-    // Warranty is configured in Edit Product. New products start with no warranty.
-    const warrantyDays = 0;
-
     const stock =
         parseInt(
             stockInput.value,
@@ -1751,9 +1745,7 @@ async function saveProduct() {
 
                         stock: stock,
 
-                        barcode: barcode,
-
-                        warranty_days: warrantyDays
+                        barcode: barcode
 
                     })
 
@@ -5494,8 +5486,6 @@ function openEditProduct(product) {
         document.getElementById(
             "edit-product-stock"
         );
-    const warrantySelect = document.getElementById("edit-product-warranty");
-    const customWarrantyInput = document.getElementById("edit-product-custom-warranty");
 
     if (
         !popup ||
@@ -5515,12 +5505,6 @@ function openEditProduct(product) {
     nameInput.value = product.name;
     priceInput.value = Number(product.price).toFixed(2);
     stockInput.value = product.stock;
-    const warrantyDays = Number(product.warranty_days || 0);
-    if (warrantySelect) {
-        const supported = [0,7,30,90,180,365];
-        warrantySelect.value = supported.includes(warrantyDays) ? String(warrantyDays) : "custom";
-        if (customWarrantyInput) { customWarrantyInput.value = supported.includes(warrantyDays) ? "" : String(warrantyDays || ""); customWarrantyInput.style.display = warrantySelect.value === "custom" ? "block" : "none"; }
-    }
 
     showEditProductMessage("");
 
@@ -5582,8 +5566,6 @@ async function saveEditedProduct() {
         document.getElementById(
             "save-edit-product"
         );
-    const warrantySelect = document.getElementById("edit-product-warranty");
-    const customWarrantyInput = document.getElementById("edit-product-custom-warranty");
 
     if (
         !nameInput ||
@@ -5602,9 +5584,6 @@ async function saveEditedProduct() {
 
     const stock =
         parseInt(stockInput.value, 10);
-    let warrantyDays = warrantySelect ? parseInt(warrantySelect.value, 10) : 0;
-    if (warrantySelect && warrantySelect.value === "custom") warrantyDays = parseInt(customWarrantyInput?.value || "0", 10) || 0;
-    if (warrantyDays < 0) warrantyDays = 0;
 
     if (!name) {
 
@@ -5661,8 +5640,7 @@ async function saveEditedProduct() {
                     body: JSON.stringify({
                         name: name,
                         price: price,
-                        stock: stock,
-                        warranty_days: warrantyDays
+                        stock: stock
                     })
                 }
             );
@@ -5860,627 +5838,6 @@ setTimeout(
     checkLiveStoreAccess,
     1500
 );
-/* ============================================================
-   RECEIPT QR SCANNER — SEPARATE FROM PRODUCT BARCODE SCANNER
-   ============================================================ */
-const receiptQrScannerButton = document.getElementById("receipt-qr-scanner-button");
-const receiptQrScannerWindow = document.getElementById("receipt-qr-scanner-window");
-const closeReceiptQrScannerButton = document.getElementById("close-receipt-qr-scanner");
-const receiptQrScannerVideo = document.getElementById("receipt-qr-scanner-video");
-const receiptQrScannerStatus = document.getElementById("receipt-qr-scanner-status");
-let receiptQrScannerStream = null;
-let receiptQrDetector = null;
-let receiptQrScannerRunning = false;
-let receiptQrDetected = false;
-
-async function openReceiptQrScanner() {
-    if (!receiptQrScannerWindow || !receiptQrScannerVideo || !receiptQrScannerStatus) return;
-    receiptQrDetected = false;
-    receiptQrScannerRunning = false;
-    receiptQrScannerWindow.classList.add("show");
-    receiptQrScannerStatus.textContent = "Opening camera...";
-    try {
-        receiptQrScannerStream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } },
-            audio: false
-        });
-        receiptQrScannerVideo.srcObject = receiptQrScannerStream;
-        await new Promise(resolve => {
-            if (receiptQrScannerVideo.readyState >= HTMLMediaElement.HAVE_METADATA) resolve();
-            else receiptQrScannerVideo.onloadedmetadata = resolve;
-        });
-        await receiptQrScannerVideo.play();
-        if (!("BarcodeDetector" in window)) {
-            receiptQrScannerStatus.textContent = "QR scanning is not supported by this browser.";
-            return;
-        }
-        const supported = await BarcodeDetector.getSupportedFormats();
-        if (!supported.includes("qr_code")) {
-            receiptQrScannerStatus.textContent = "This browser does not support QR code scanning.";
-            return;
-        }
-        receiptQrDetector = new BarcodeDetector({formats:["qr_code"]});
-        receiptQrScannerRunning = true;
-        receiptQrScannerStatus.textContent = "Scanning receipt QR...";
-        scanReceiptQr();
-    } catch (error) {
-        console.error("Receipt QR scanner error:", error);
-        receiptQrScannerStatus.textContent = "Scanner error: " + error.message;
-    }
-}
-
-async function scanReceiptQr() {
-    if (!receiptQrScannerRunning || receiptQrDetected) return;
-    if (receiptQrScannerVideo.readyState < HTMLMediaElement.HAVE_ENOUGH_DATA) {
-        requestAnimationFrame(scanReceiptQr);
-        return;
-    }
-    try {
-        const codes = await receiptQrDetector.detect(receiptQrScannerVideo);
-        if (codes.length) {
-            const value = String(codes[0].rawValue || "").trim();
-            receiptQrDetected = true;
-            if (!value.startsWith("ESQR:")) {
-                receiptQrScannerStatus.textContent = "That is not an Easy_Sales receipt QR code. Try again.";
-                receiptQrDetected = false;
-                setTimeout(() => { if (receiptQrScannerRunning) requestAnimationFrame(scanReceiptQr); }, 900);
-                return;
-            }
-            const token = value.slice(5).trim();
-            receiptQrScannerStatus.textContent = "Loading receipt...";
-            const response = await fetch("/api/receipt/lookup/" + encodeURIComponent(token), {cache:"no-store"});
-            const data = await response.json();
-            if (response.ok && data.success && data.receipt) {
-                closeReceiptQrScanner();
-                openWarrantyReceipt(data.receipt, data.claims || []);
-                return;
-            }
-            receiptQrScannerStatus.textContent = data.error || "Receipt not found.";
-            receiptQrDetected = false;
-            setTimeout(() => { if (receiptQrScannerRunning) requestAnimationFrame(scanReceiptQr); }, 1200);
-        }
-    } catch (error) {
-        console.error("Receipt QR detection error:", error);
-        receiptQrDetected = false;
-    }
-    if (receiptQrScannerRunning && !receiptQrDetected) requestAnimationFrame(scanReceiptQr);
-}
-
-function closeReceiptQrScanner() {
-    receiptQrScannerRunning = false;
-    receiptQrDetected = false;
-    if (receiptQrScannerStream) {
-        receiptQrScannerStream.getTracks().forEach(track => track.stop());
-        receiptQrScannerStream = null;
-    }
-    if (receiptQrScannerVideo) {
-        receiptQrScannerVideo.pause();
-        receiptQrScannerVideo.srcObject = null;
-    }
-    if (receiptQrScannerWindow) receiptQrScannerWindow.classList.remove("show");
-}
-
-if (receiptQrScannerButton) receiptQrScannerButton.addEventListener("click", openReceiptQrScanner);
-if (closeReceiptQrScannerButton) {
-    closeReceiptQrScannerButton.addEventListener("click", function(event) {
-        event.preventDefault();
-        event.stopPropagation();
-        closeReceiptQrScanner();
-    });
-    closeReceiptQrScannerButton.addEventListener("touchend", function(event) {
-        event.preventDefault();
-        event.stopPropagation();
-        closeReceiptQrScanner();
-    }, {passive: false});
-}
-
-/* ============================================================
-   POS BARCODE SCANNER
-   ============================================================ */
-
-const scannerButton =
-    document.getElementById("scanner-button");
-
-const scannerWindow =
-    document.getElementById("scanner-window");
-
-const closeScannerButton =
-    document.getElementById("close-scanner");
-
-const scannerVideo =
-    document.getElementById("scanner-video");
-
-const scannerStatus =
-    document.getElementById("scanner-status");
-
-
-let scannerStream = null;
-let barcodeDetector = null;
-let scannerRunning = false;
-let barcodeDetected = false;
-
-
-/* ============================================================
-   OPEN SCANNER
-   ============================================================ */
-
-async function openScanner() {
-
-    if (
-        !scannerWindow ||
-        !scannerVideo ||
-        !scannerStatus
-    ) {
-        console.error(
-            "Scanner elements were not found."
-        );
-        return;
-    }
-
-
-    // Reset scanner every time it opens
-    barcodeDetected = false;
-    scannerRunning = false;
-
-    scannerWindow.classList.add("show");
-
-    scannerStatus.textContent =
-        "Opening camera...";
-
-
-    try {
-
-        // Open the rear camera
-        scannerStream =
-            await navigator.mediaDevices.getUserMedia({
-
-                video: {
-                    facingMode: {
-                        ideal: "environment"
-                    },
-                    width: {
-                        ideal: 1920
-                    },
-                    height: {
-                        ideal: 1080
-                    }
-                },
-
-                audio: false
-
-            });
-
-
-        scannerVideo.srcObject =
-            scannerStream;
-
-
-        // Wait until the video actually has camera data
-        await new Promise(
-            function(resolve) {
-
-                scannerVideo.onloadedmetadata =
-                    function() {
-                        resolve();
-                    };
-
-            }
-        );
-
-
-        await scannerVideo.play();
-
-
-        scannerStatus.textContent =
-            "Camera ready — point at a barcode";
-
-
-        // Check whether BarcodeDetector exists
-        if (!("BarcodeDetector" in window)) {
-
-            scannerStatus.textContent =
-                "Barcode detection is not supported by this browser.";
-
-            console.error(
-                "BarcodeDetector is not supported."
-            );
-
-            return;
-        }
-
-
-        // Ask the browser which formats it supports
-        const supportedFormats =
-            await BarcodeDetector.getSupportedFormats();
-
-
-        const wantedFormats = [
-            "ean_13",
-            "ean_8",
-            "code_128",
-            "code_39",
-            "upc_a",
-            "upc_e",
-            "qr_code"
-        ];
-
-
-        // Only use formats actually supported by the phone/browser
-        const formats =
-            wantedFormats.filter(
-                format =>
-                    supportedFormats.includes(format)
-            );
-
-
-        barcodeDetector =
-            new BarcodeDetector({
-                formats: formats
-            });
-
-
-        scannerRunning = true;
-
-
-        scannerStatus.textContent =
-            "Scanning... hold the barcode inside the camera.";
-
-        scanBarcode();
-
-
-    } catch (error) {
-
-        console.error(
-            "Scanner error:",
-            error
-        );
-
-        scannerStatus.textContent =
-            "Scanner error: " +
-            error.message;
-
-    }
-
-}
-
-
-/* ============================================================
-   SCAN BARCODE
-   ============================================================ */
-
-async function scanBarcode() {
-
-    if (
-        !scannerRunning ||
-        barcodeDetected
-    ) {
-        return;
-    }
-
-
-    if (
-        scannerVideo.readyState <
-        HTMLMediaElement.HAVE_ENOUGH_DATA
-    ) {
-
-        requestAnimationFrame(
-            scanBarcode
-        );
-
-        return;
-    }
-
-
-    try {
-
-        const barcodes =
-            await barcodeDetector.detect(
-                scannerVideo
-            );
-
-
-        if (barcodes.length > 0) {
-
-            const barcode =
-                String(
-                    barcodes[0].rawValue
-                ).trim();
-
-
-            // Prevent multiple detections while checking
-            barcodeDetected = true;
-
-
-            scannerStatus.textContent =
-                "Checking product barcode...";
-
-
-            console.log(
-                "EASY SALES BARCODE DETECTED:",
-                JSON.stringify(barcode)
-            );
-
-
-            try {
-                const response =
-                    await fetch(
-                        "/api/products/barcode/" +
-                        encodeURIComponent(barcode),
-                        {
-                            cache: "no-store"
-                        }
-                    );
-
-
-                const data =
-                    await response.json();
-
-
-                // ====================================================
-                // PRODUCT FOUND
-                // ====================================================
-
-                if (
-                    response.ok &&
-                    data.success &&
-                    data.product
-                ) {
-
-                    scannerRunning = false;
-
-
-                    console.log(
-                        "EASY SALES PRODUCT FOUND:",
-                        data.product
-                    );
-
-
-                    addToCart(
-                        data.product
-                    );
-
-
-                    scannerStatus.textContent =
-                        "✓ Added to cart: " +
-                        data.product.name;
-
-
-                    // Stop camera only after successful scan
-                    if (scannerStream) {
-
-                        scannerStream
-                            .getTracks()
-                            .forEach(
-                                track => track.stop()
-                            );
-
-                        scannerStream = null;
-
-                    }
-
-
-                    setTimeout(
-                        function() {
-                            closeScanner();
-                        },
-                        700
-                    );
-
-                    return;
-
-                }
-
-
-                // ====================================================
-                // PRODUCT NOT FOUND
-                // ====================================================
-
-                scannerStatus.textContent =
-                    "⚠ Barcode not registered. Try again.";
-
-
-                console.log(
-                    "BARCODE NOT REGISTERED:",
-                    barcode,
-                    data
-                );
-
-
-                // Allow another scan WITHOUT stopping camera
-                barcodeDetected = false;
-
-
-                setTimeout(
-                    function() {
-
-                        if (scannerRunning) {
-
-                            requestAnimationFrame(
-                                scanBarcode
-                            );
-
-                        }
-
-                    },
-                    1000
-                );
-
-                return;
-
-
-            } catch (error) {
-
-                console.error(
-                    "BARCODE PRODUCT LOOKUP ERROR:",
-                    error
-                );
-
-
-                scannerStatus.textContent =
-                    "Could not look up product. Trying again...";
-
-
-                barcodeDetected = false;
-
-
-                setTimeout(
-                    function() {
-
-                        if (scannerRunning) {
-
-                            requestAnimationFrame(
-                                scanBarcode
-                            );
-
-                        }
-
-                    },
-                    1000
-                );
-
-                return;
-
-            }
-
-        }
-
-
-    } catch (error) {
-
-        console.error(
-            "Barcode detection error:",
-            error
-        );
-
-    }
-
-
-    if (
-        scannerRunning &&
-        !barcodeDetected
-    ) {
-
-        requestAnimationFrame(
-            scanBarcode
-        );
-
-    }
-
-}
-
-/* ============================================================
-   CLOSE SCANNER
-   ============================================================ */
-
-function closeScanner() {
-
-    scannerRunning = false;
-    barcodeDetected = false;
-
-
-    if (scannerStream) {
-
-        scannerStream
-            .getTracks()
-            .forEach(
-                track => track.stop()
-            );
-
-        scannerStream = null;
-
-    }
-
-
-    if (scannerVideo) {
-
-        scannerVideo.pause();
-
-        scannerVideo.srcObject =
-            null;
-
-    }
-
-
-    if (scannerWindow) {
-
-        scannerWindow.classList.remove(
-            "show"
-        );
-
-    }
-
-}
-
-
-/* ============================================================
-   SCANNER BUTTON EVENTS
-   ============================================================ */
-
-if (scannerButton) {
-
-    scannerButton.addEventListener(
-        "click",
-        openScanner
-    );
-
-}
-
-
-if (closeScannerButton) {
-
-    closeScannerButton.addEventListener(
-        "click",
-        closeScanner
-    );
-
-}
-
-
-// ============================================================
-// WARRANTY / RECEIPT QR SERVICE
-// ============================================================
-async function openWarrantyReceipt(receipt, claims) {
-    const win=document.getElementById("warranty-window"), content=document.getElementById("warranty-content");
-    if(!win||!content||!receipt) return;
-    const items=Array.isArray(receipt.items)?receipt.items:[];
-    let html=`<div><strong>Receipt #${escapeReceiptHtml(String(receipt.transaction_id||"").slice(0,18))}</strong><br>${escapeReceiptHtml(receipt.sold_at||"")}</div><hr>`;
-    items.forEach(function(item){
-        const claimed=Number(item.claimed_quantity||0), qty=Number(item.quantity||0), remaining=qty-claimed;
-        const warranty=Number(item.warranty_days||0); const status=item.warranty_status|| (warranty?"ACTIVE":"NO WARRANTY");
-        html+=`<div class="warranty-card" style="border:1px solid #ddd;border-radius:10px;padding:12px;margin:10px 0"><strong>${escapeReceiptHtml(item.name)}</strong><br>Sold: ${escapeReceiptHtml(item.warranty_start||receipt.sold_at||"")}<br>Warranty: ${warranty?warranty+" days":"None"}<br>Expiry: ${escapeReceiptHtml(item.warranty_expiry||"—")}<br>Status: <strong>${escapeReceiptHtml(status)}</strong><br>Claimed: ${claimed} / ${qty}`;
-        if(warranty>0 && remaining>0 && status!=="EXPIRED"){
-            html+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px"><button type="button" onclick="startWarrantyAction('${String(receipt.receipt_token)}',${Number(item.product_id)},${remaining},'REFUND')">REFUND</button><button type="button" onclick="startWarrantyAction('${String(receipt.receipt_token)}',${Number(item.product_id)},${remaining},'REPLACEMENT')">REPLACEMENT</button></div>`;
-        }
-        html+=`</div>`;
-    });
-    if(claims.length) { html+=`<hr><strong>Warranty Actions</strong>`; claims.forEach(c=>html+=`<div style="font-size:12px;margin-top:6px">${escapeReceiptHtml(c.action)} • ${escapeReceiptHtml(c.product_name)} × ${Number(c.quantity)} • ${escapeReceiptHtml(c.action_at)}</div>`); }
-    content.innerHTML=html; win.classList.add("show"); win.setAttribute("aria-hidden","false");
-}
-
-async function startWarrantyAction(token, productId, maxQty, action){
-    let quantity=parseInt(prompt(`Quantity for ${action.toLowerCase()} (1-${maxQty}):`, "1"),10);
-    if(!quantity || quantity<1 || quantity>maxQty){ if(quantity!==null) showMessage("Invalid quantity."); return; }
-    let replacementProductId=null;
-    if(action==="REPLACEMENT"){
-        const productsResponse=await fetch("/api/products?t="+Date.now()); const data=await productsResponse.json();
-        const products=(data.products||[]).filter(p=>Number(p.stock)>0);
-        if(!products.length){showMessage("No replacement stock is available.");return;}
-        const options=products.map((p,i)=>`${i+1}. ${p.name} (stock ${p.stock})`).join("\n");
-        const choice=prompt("Select replacement product number:\n\n"+options,"1"); const idx=parseInt(choice,10)-1;
-        if(!Number.isInteger(idx)||!products[idx]) return; replacementProductId=products[idx].id;
-    }
-    const response=await fetch("/api/receipt/"+encodeURIComponent(token)+"/warranty-claim",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({product_id:productId,quantity,action,replacement_product_id:replacementProductId,device_time:getDeviceLocalDateTime()})});
-    const data=await response.json();
-    if(!response.ok||!data.success){showMessage(data.message||"Warranty action failed.");return;}
-    showMessage(action+" recorded. Saved receipt updated.");
-    lastReceipt = data.receipt;
-    await openWarrantyReceipt(data.receipt,data.claims||[]);
-    showReceipt(data.receipt);
-    if(typeof loadProducts === "function") await loadProducts();
-}
-
-function closeWarrantyReceipt(){const win=document.getElementById("warranty-window");if(win){win.classList.remove("show");win.setAttribute("aria-hidden","true");}}
-
 // ============================================================
 // RECEIPT PREVIEW / PRINT / SHARE
 // ============================================================
@@ -6515,7 +5872,6 @@ function buildReceiptHtml(receipt) {
     items.forEach(function(item) {
         html += `<div class="receipt-item"><span class="receipt-item-name">${escapeReceiptHtml(item.name)} × ${Number(item.quantity || 0)}</span><span class="receipt-item-total">${receiptMoney(item.line_total, receipt)}</span></div>`;
         html += `<div style="font-size:12px">${receiptMoney(item.unit_price, receipt)} each</div>`;
-        if (Number(item.warranty_days || 0) > 0) { html += `<div style="font-size:11px">Warranty: ${Number(item.warranty_days)} days • Expiry: ${escapeReceiptHtml(item.warranty_expiry || "")} • ${escapeReceiptHtml(item.warranty_status || "ACTIVE")}</div>`; } else if (item.warranty_status) { html += `<div style="font-size:11px">Warranty: ${escapeReceiptHtml(item.warranty_status)}</div>`; }
     });
     html += `<div class="receipt-line"></div>`;
     html += `<div class="receipt-summary-row"><span>Subtotal</span><span>${receiptMoney(receipt.subtotal, receipt)}</span></div>`;
@@ -6541,7 +5897,6 @@ function buildReceiptText(receipt) {
     lines.push("RECEIPT");
     lines.push(receipt.sold_at || "");
     if (receipt.transaction_id) lines.push("Receipt #: " + receipt.transaction_id);
-    if (receipt.receipt_token) lines.push("QR: Scan this receipt in Easy_Sales for warranty/refund service.");
     lines.push("------------------------------");
     (receipt.items || []).forEach(function(item) {
         lines.push(`${item.name} x ${item.quantity}  ${currency}${Number(item.line_total || 0).toFixed(2)}`);
@@ -6604,17 +5959,15 @@ function bytesToTextBytes(value) {
     });
 }
 
-function escposQrBytes(data, moduleSize) {
-    const bytes = [];
-    const d = new TextEncoder().encode(String(data || ""));
-    const push = (...a) => bytes.push(...a);
-    const size = Math.max(1, Math.min(16, Number(moduleSize || 5)));
-    push(0x1D,0x28,0x6B,0x04,0x00,0x31,0x41,0x32,0x00); // model 2
-    push(0x1D,0x28,0x6B,0x03,0x00,0x31,0x43,size); // module size
-    push(0x1D,0x28,0x6B,0x03,0x00,0x31,0x45,0x31); // ECC M
-    const len=d.length+3, pL=len&0xFF, pH=(len>>8)&0xFF;
-    push(0x1D,0x28,0x6B,pL,pH,0x31,0x50,0x30,...d); // store
-    push(0x1D,0x28,0x6B,0x03,0x00,0x31,0x51,0x30); // print
+function escposBarcodeBytes(data) {
+    const bytes=[]; const push=(...a)=>bytes.push(...a);
+    const value=String(data||'').replace(/[^\x20-\x7E]/g,'').slice(0,80);
+    const d=new TextEncoder().encode(value);
+    push(0x1D,0x48,0x02); // HRI below barcode
+    push(0x1D,0x68,0x50); // height
+    push(0x1D,0x77,0x02); // width
+    push(0x1D,0x6B,0x49,d.length,...d); // Code 128, GS k m n data
+    push(0x0A);
     return bytes;
 }
 
@@ -6659,11 +6012,10 @@ function escposReceiptBytes(receipt, paperWidth) {
         right("Cash: ", receipt.cash_received);
         right("Change: ", receipt.change);
     }
-    if (receipt.receipt_token) {
+    if (receipt.transaction_id) {
         push(ESCPOS.ALIGN_CENTER);
-        lineText("SCAN FOR WARRANTY");
-        push(...escposQrBytes("ESQR:" + receipt.receipt_token, 5));
-        lineText("Scan in Easy_Sales");
+        lineText("ORDER / RECEIPT");
+        push(...escposBarcodeBytes(receipt.transaction_id));
     }
     push(ESCPOS.ALIGN_CENTER);
     lineText("Thank you!");
@@ -6899,3 +6251,20 @@ async function shareReceipt() {
         showMessage("Receipt sharing is not supported on this browser.");
     }
 }
+
+
+// ============================================================
+// RESTAURANT ADD-ON BUTTON
+// ============================================================
+(async function setupRestaurantButton(){
+    const button=document.getElementById('restaurant-button');
+    if(!button) return;
+    try{
+        const response=await fetch('/api/restaurant/status?ts='+Date.now(),{cache:'no-store'});
+        const data=await response.json();
+        if(response.ok && data.success && data.enabled){
+            button.style.display='inline-flex';
+            button.addEventListener('click',()=>{ window.location.href='/restaurant'; });
+        }
+    }catch(error){ console.error('Restaurant add-on status error:',error); }
+})();
