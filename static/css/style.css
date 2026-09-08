@@ -3124,6 +3124,36 @@ button:active {
 
 }
 
+
+/* ============================================================
+   RECEIPT QR SCANNER EXIT BUTTON
+   ============================================================ */
+#close-receipt-qr-scanner,
+.scanner-close-button {
+    width: 42px;
+    min-width: 42px;
+    height: 42px;
+    min-height: 42px;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: #ffffff;
+    color: #222222;
+    font-size: 28px;
+    line-height: 42px;
+    text-align: center;
+    cursor: pointer;
+    pointer-events: auto;
+    touch-action: manipulation;
+    position: relative;
+    z-index: 10001;
+    flex: 0 0 auto;
+}
+#close-receipt-qr-scanner:active,
+.scanner-close-button:active {
+    transform: scale(0.94);
+}
+
 /* ============================================================
    TOP RIGHT BARCODE SCANNER BUTTON
    ============================================================ */
