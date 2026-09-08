@@ -902,6 +902,18 @@ function setupEmployeeModeButtons() {
 
 function setupButtons() {
 
+    // POS BARCODE SCANNER
+    const scannerButton = document.getElementById("scanner-button");
+    const closeScannerButton = document.getElementById("close-pos-scanner");
+
+    if (scannerButton) {
+        scannerButton.addEventListener("click", openPosBarcodeScanner);
+    }
+
+    if (closeScannerButton) {
+        closeScannerButton.addEventListener("click", closePosBarcodeScanner);
+    }
+
     setupEmployeeModeButtons();
 
     const cartButton =
@@ -1286,6 +1298,155 @@ function clearCart() {
 
     }
 
+}
+
+
+// ============================================================
+// 13. POS BARCODE SCANNER
+// ============================================================
+
+let posScannerStream = null;
+let posBarcodeDetector = null;
+let posScannerRunning = false;
+let posBarcodeDetected = false;
+
+async function openPosBarcodeScanner() {
+    const scannerWindow = document.getElementById("pos-scanner-window");
+    const scannerVideo = document.getElementById("pos-scanner-camera");
+    const scannerStatus = document.getElementById("pos-scanner-status");
+
+    if (!scannerWindow || !scannerVideo || !scannerStatus) {
+        console.error("POS scanner elements were not found.");
+        return;
+    }
+
+    posBarcodeDetected = false;
+    posScannerRunning = false;
+    scannerWindow.classList.add("show");
+    scannerStatus.textContent = "Opening camera...";
+
+    try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            scannerStatus.textContent = "Camera access is not supported by this browser.";
+            return;
+        }
+
+        posScannerStream = await navigator.mediaDevices.getUserMedia({
+            video: {
+                facingMode: { ideal: "environment" },
+                width: { ideal: 1920 },
+                height: { ideal: 1080 }
+            },
+            audio: false
+        });
+
+        scannerVideo.srcObject = posScannerStream;
+        await new Promise(function(resolve) {
+            if (scannerVideo.readyState >= HTMLMediaElement.HAVE_METADATA) {
+                resolve();
+            } else {
+                scannerVideo.onloadedmetadata = resolve;
+            }
+        });
+        await scannerVideo.play();
+
+        if (!("BarcodeDetector" in window)) {
+            scannerStatus.textContent = "Barcode detection is not supported by this browser.";
+            return;
+        }
+
+        const supportedFormats = await BarcodeDetector.getSupportedFormats();
+        const wantedFormats = ["ean_13", "ean_8", "code_128", "code_39", "upc_a", "upc_e"];
+        const formats = wantedFormats.filter(function(format) {
+            return supportedFormats.includes(format);
+        });
+
+        if (!formats.length) {
+            scannerStatus.textContent = "No supported barcode formats were found.";
+            return;
+        }
+
+        posBarcodeDetector = new BarcodeDetector({ formats: formats });
+        posScannerRunning = true;
+        scannerStatus.textContent = "Scanning... hold the barcode inside the frame.";
+        scanPosBarcode();
+    } catch (error) {
+        console.error("POS SCANNER ERROR:", error);
+        scannerStatus.textContent = "Scanner error: " + (error.message || "Could not open camera.");
+    }
+}
+
+async function scanPosBarcode() {
+    if (!posScannerRunning || posBarcodeDetected) return;
+
+    const scannerVideo = document.getElementById("pos-scanner-camera");
+    const scannerStatus = document.getElementById("pos-scanner-status");
+    if (!scannerVideo || !scannerStatus || !posBarcodeDetector) return;
+
+    if (scannerVideo.readyState < HTMLMediaElement.HAVE_ENOUGH_DATA) {
+        requestAnimationFrame(scanPosBarcode);
+        return;
+    }
+
+    try {
+        const barcodes = await posBarcodeDetector.detect(scannerVideo);
+        if (barcodes.length > 0) {
+            const barcode = String(barcodes[0].rawValue || "").trim();
+            if (!barcode) {
+                requestAnimationFrame(scanPosBarcode);
+                return;
+            }
+
+            posBarcodeDetected = true;
+            posScannerRunning = false;
+            scannerStatus.textContent = "✓ Barcode detected: " + barcode;
+
+            // Look up the owner's stored product — no internet product database.
+            const response = await fetch("/api/products/barcode/" + encodeURIComponent(barcode) + "?t=" + Date.now(), {
+                cache: "no-store"
+            });
+            const data = await response.json();
+
+            if (!response.ok || !data.success || !data.product) {
+                scannerStatus.textContent = data.message || "Barcode not registered to a product.";
+                posBarcodeDetected = false;
+                posScannerRunning = true;
+                requestAnimationFrame(scanPosBarcode);
+                return;
+            }
+
+            addToCart(data.product);
+            scannerStatus.textContent = "✓ " + data.product.name + " added to cart.";
+
+            setTimeout(closePosBarcodeScanner, 700);
+            return;
+        }
+    } catch (error) {
+        console.error("POS BARCODE DETECTION/LOOKUP ERROR:", error);
+    }
+
+    if (posScannerRunning && !posBarcodeDetected) {
+        requestAnimationFrame(scanPosBarcode);
+    }
+}
+
+function closePosBarcodeScanner() {
+    posScannerRunning = false;
+    posBarcodeDetected = false;
+
+    if (posScannerStream) {
+        posScannerStream.getTracks().forEach(function(track) { track.stop(); });
+        posScannerStream = null;
+    }
+
+    const scannerVideo = document.getElementById("pos-scanner-camera");
+    if (scannerVideo) {
+        scannerVideo.pause();
+        scannerVideo.srcObject = null;
+    }
+
+    const scannerWindow = document.getElementById("pos-scanner-window");
+    if (scannerWindow) scannerWindow.classList.remove("show");
 }
 
 
