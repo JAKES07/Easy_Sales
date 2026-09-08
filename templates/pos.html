@@ -50,10 +50,10 @@
     >
     <button
     id="scanner-button"
-    class="top-right-scanner"
+    class="top-left-scanner"
     type="button">
 
-    📷 Scan
+    📷 Scan Receipt / Product
 
 </button>
 
@@ -164,7 +164,7 @@
 
         <div>
             <h2>Scan Product</h2>
-            <span>Point the camera at a product barcode</span>
+            <span>Scan a receipt QR code or product barcode</span>
         </div>
 
         <button
@@ -445,6 +445,18 @@
 
         <label for="edit-product-stock">Stock</label>
         <input type="number" id="edit-product-stock" min="0" placeholder="Stock quantity...">
+
+        <label for="edit-product-warranty">Warranty</label>
+        <select id="edit-product-warranty">
+            <option value="0">No Warranty</option>
+            <option value="7">7 Days</option>
+            <option value="30">30 Days</option>
+            <option value="90">3 Months (90 Days)</option>
+            <option value="180">6 Months (180 Days)</option>
+            <option value="365">12 Months (365 Days)</option>
+            <option value="custom">Custom</option>
+        </select>
+        <input type="number" id="edit-product-custom-warranty" min="1" placeholder="Custom warranty days" style="display:none;">
 
         <div id="edit-product-status" class="barcode-status"></div>
 
@@ -850,6 +862,14 @@
 <!-- ========================================================
      RECEIPT PREVIEW
      ======================================================== -->
+<div id="warranty-window" class="owner-window" aria-hidden="true">
+    <div class="owner-header">
+        <div><h2>Warranty / Receipt</h2><span>Scan the receipt QR to verify the original sale</span></div>
+        <button id="close-warranty-window" type="button">×</button>
+    </div>
+    <div id="warranty-content" class="add-product-content"></div>
+</div>
+
 <div id="receipt-window" class="receipt-window" aria-hidden="true">
     <div class="receipt-dialog">
         <div class="receipt-actions-top no-print">
@@ -877,6 +897,8 @@
 </div>
 
 <style>
+.receipt-qr-top-right{display:flex;flex-direction:column;align-items:flex-end;margin:4px 0 8px;font-size:10px;font-weight:700;}
+.receipt-qr-top-right img{width:28mm;height:28mm;object-fit:contain;}
 .receipt-window{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center;z-index:9999;padding:16px;box-sizing:border-box;}
 .receipt-window.show{display:flex;}
 .receipt-dialog{background:#f4f4f4;border-radius:16px;width:min(100%,520px);max-height:94vh;overflow:auto;padding:16px;box-sizing:border-box;}
