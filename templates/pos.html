@@ -90,15 +90,6 @@
             </button>
 
 
-            <!-- EMPLOYEE MODE -->
-            <button
-                id="employee-mode-button"
-                type="button">
-
-                👤 Employee Mode
-
-            </button>
-
 
         </div>
 
@@ -914,32 +905,29 @@
 
 
 <!-- ========================================================
-     EMPLOYEE MODE PASSWORD WINDOW
+     EMPLOYEE MODE PASSWORD SETUP
      ======================================================== -->
 <div id="employee-mode-window" class="owner-window employee-mode-window">
     <div class="owner-header">
         <div>
-            <h2 id="employee-mode-title">Employee Mode</h2>
-            <span id="employee-mode-subtitle">Enter the owner password to continue.</span>
+            <h2 id="employee-mode-title">Create Employee Mode Password</h2>
+            <span id="employee-mode-subtitle">Create the password the owner will type in the search bar and press Enter to switch Employee Mode on or off.</span>
         </div>
         <button id="close-employee-mode" type="button">×</button>
     </div>
 
     <div class="add-product-content">
         <div id="employee-mode-setup-fields">
-            <label for="employee-mode-password">Create Employee Mode Password</label>
+            <label for="employee-mode-password">Employee Mode Password</label>
             <input type="password" id="employee-mode-password" autocomplete="new-password" placeholder="Create password...">
 
             <label for="employee-mode-password-confirm">Confirm Password</label>
             <input type="password" id="employee-mode-password-confirm" autocomplete="new-password" placeholder="Confirm password...">
         </div>
 
-        <div id="employee-mode-enter-fields" style="display:none;">
-            <label for="employee-mode-enter-password">Owner Password</label>
-            <input type="password" id="employee-mode-enter-password" autocomplete="current-password" placeholder="Enter password...">
-        </div>
+        <div id="employee-mode-enter-fields" style="display:none;"></div>
 
-        <button id="employee-mode-confirm" class="save-product-button" type="button">CONTINUE</button>
+        <button id="employee-mode-confirm" class="save-product-button" type="button">SAVE PASSWORD</button>
         <div id="employee-mode-message" style="margin-top:12px;color:#b00020;"></div>
     </div>
 </div>
