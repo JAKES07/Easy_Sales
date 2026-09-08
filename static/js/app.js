@@ -1312,7 +1312,7 @@ let posBarcodeDetected = false;
 
 async function openPosBarcodeScanner() {
     const scannerWindow = document.getElementById("pos-scanner-window");
-    const scannerVideo = document.getElementById("pos-scanner-camera");
+    const scannerVideo = document.getElementById("pos-scanner-video");
     const scannerStatus = document.getElementById("pos-scanner-status");
 
     if (!scannerWindow || !scannerVideo || !scannerStatus) {
@@ -1379,7 +1379,7 @@ async function openPosBarcodeScanner() {
 async function scanPosBarcode() {
     if (!posScannerRunning || posBarcodeDetected) return;
 
-    const scannerVideo = document.getElementById("pos-scanner-camera");
+    const scannerVideo = document.getElementById("pos-scanner-video");
     const scannerStatus = document.getElementById("pos-scanner-status");
     if (!scannerVideo || !scannerStatus || !posBarcodeDetector) return;
 
@@ -1439,7 +1439,7 @@ function closePosBarcodeScanner() {
         posScannerStream = null;
     }
 
-    const scannerVideo = document.getElementById("pos-scanner-camera");
+    const scannerVideo = document.getElementById("pos-scanner-video");
     if (scannerVideo) {
         scannerVideo.pause();
         scannerVideo.srcObject = null;
