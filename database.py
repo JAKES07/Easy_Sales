@@ -304,20 +304,21 @@ def _ensure_column(cursor, table_name, column_name, definition):
 
 
 
-def add_product(name, price, stock, barcode=None):
+def add_product(name, price, stock, barcode=None, warranty_days=0):
     """Add a product with an optional barcode."""
     connection = get_connection()
     cursor = connection.cursor()
 
     try:
         cursor.execute("""
-            INSERT INTO products (name, price, stock, barcode)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO products (name, price, stock, barcode, warranty_days)
+            VALUES (?, ?, ?, ?, ?)
         """, (
             name,
             price,
             stock,
-            barcode.strip() if barcode else None
+            barcode.strip() if barcode else None,
+            max(0, int(warranty_days or 0))
         ))
 
         product_id = cursor.lastrowid
@@ -359,7 +360,7 @@ def get_all_products():
     connection = get_connection()
 
     rows = connection.execute("""
-        SELECT id, name, price, stock, barcode
+        SELECT id, name, price, stock, barcode, warranty_days
         FROM products
         WHERE active = 1
         ORDER BY name
@@ -535,7 +536,7 @@ def get_product_by_barcode(barcode):
     try:
 
         product = connection.execute("""
-            SELECT id, name, price, stock, barcode
+            SELECT id, name, price, stock, barcode, warranty_days
             FROM products
             WHERE barcode = ?
         """, (str(barcode).strip(),)).fetchone()
@@ -552,14 +553,14 @@ def get_product_by_barcode(barcode):
 
 
 
-def update_product(product_id, name, price, stock):
+def update_product(product_id, name, price, stock, warranty_days=0):
     """Update product details and record stock changes in movement history."""
     connection = get_connection()
     cursor = connection.cursor()
 
     try:
         product = cursor.execute(
-            "SELECT id, name, price, stock FROM products WHERE id = ?",
+            "SELECT id, name, price, stock, warranty_days FROM products WHERE id = ?",
             (product_id,)
         ).fetchone()
 
@@ -573,9 +574,9 @@ def update_product(product_id, name, price, stock):
 
         cursor.execute("""
             UPDATE products
-            SET name = ?, price = ?, stock = ?
+            SET name = ?, price = ?, stock = ?, warranty_days = ?
             WHERE id = ?
-        """, (name, float(price), new_stock, product_id))
+        """, (name, float(price), new_stock, max(0, int(warranty_days or 0)), product_id))
 
         if adjustment != 0:
             cursor.execute("""
@@ -603,7 +604,8 @@ def update_product(product_id, name, price, stock):
             "id": product_id,
             "name": name,
             "price": float(price),
-            "stock": new_stock
+            "stock": new_stock,
+            "warranty_days": max(0, int(warranty_days or 0))
         }
 
     except Exception:
@@ -621,6 +623,7 @@ def complete_sale(cart, payment_method, sale_fee=0.0, sold_at_override=None):
     # Fall back to the server clock for non-browser/internal callers.
     sold_at = str(sold_at_override).strip() if sold_at_override else now_string()
     transaction_id = str(uuid.uuid4())
+    receipt_token = uuid.uuid4().hex + uuid.uuid4().hex
     total_sale = 0.0
     receipt_items = []
 
@@ -637,7 +640,7 @@ def complete_sale(cart, payment_method, sale_fee=0.0, sold_at_override=None):
                 raise ValueError("Invalid sale quantity.")
 
             product = cursor.execute(
-                "SELECT id, name, price, stock FROM products WHERE id = ?",
+                "SELECT id, name, price, stock, warranty_days FROM products WHERE id = ?",
                 (product_id,)
             ).fetchone()
 
@@ -696,12 +699,22 @@ def complete_sale(cart, payment_method, sale_fee=0.0, sold_at_override=None):
             ))
 
             total_sale += line_total
+            warranty_days = int(product["warranty_days"] or 0)
+            try:
+                sold_dt = datetime.datetime.strptime(sold_at, "%Y-%m-%d %H:%M:%S")
+                expiry_at = (sold_dt + datetime.timedelta(days=warranty_days)).strftime("%Y-%m-%d %H:%M:%S") if warranty_days > 0 else None
+            except Exception:
+                expiry_at = None
             receipt_items.append({
                 "product_id": product_id,
                 "name": product["name"],
                 "quantity": quantity,
                 "unit_price": round(unit_price, 2),
-                "line_total": round(line_total, 2)
+                "line_total": round(line_total, 2),
+                "warranty_days": warranty_days,
+                "warranty_start": sold_at,
+                "warranty_expiry": expiry_at,
+                "warranty_status": "ACTIVE" if warranty_days > 0 else "NO WARRANTY"
             })
 
         connection.commit()
@@ -711,6 +724,7 @@ def complete_sale(cart, payment_method, sale_fee=0.0, sold_at_override=None):
             "total": round(total_sale + sale_fee, 2),
             "sold_at": sold_at,
             "transaction_id": transaction_id,
+            "receipt_token": receipt_token,
             "items": receipt_items
         }
 
@@ -1023,7 +1037,22 @@ def create_monthly_report(cash_at_hand, damaged_goods, created_at_override=None)
         damaged_value = 0.0
         damaged_items = []
 
-        # Remove every damaged item from actual stock and record it.
+        # Warranty returns are permanently classified as damaged goods. They
+        # were never returned to sellable stock, so the report records their
+        # value here without subtracting stock a second time.
+        warranty_damaged = cursor.execute("""
+            SELECT product_id, product_name, SUM(quantity) AS quantity,
+                   SUM(quantity * (SELECT price FROM products WHERE products.id = warranty_claims.product_id)) AS value
+            FROM warranty_claims
+            WHERE substr(action_at,1,7)=?
+            GROUP BY product_id, product_name
+        """, (report_month,)).fetchall()
+        for item in warranty_damaged:
+            qty=int(item["quantity"] or 0); value=float(item["value"] or 0)
+            damaged_units += qty; damaged_value += value
+            damaged_items.append({"product_id": item["product_id"], "product_name": item["product_name"], "quantity": qty, "value": round(value,2), "source": "WARRANTY_RETURN"})
+
+        # Remove every manually entered damaged item from actual stock and record it.
         for item in damaged_goods:
             product_id = int(item.get("product_id"))
             quantity = int(item.get("quantity"))
@@ -1086,15 +1115,15 @@ def create_monthly_report(cash_at_hand, damaged_goods, created_at_override=None)
         sales_summary = cursor.execute("""
             SELECT
                 COUNT(DISTINCT CASE WHEN payment_method = 'cash' THEN transaction_id END) AS cash_sales_count,
-                COALESCE(SUM(CASE WHEN payment_method = 'cash' THEN total + COALESCE(sale_fee, 0) ELSE 0 END), 0) AS cash_sales_amount,
+                COALESCE(SUM(CASE WHEN payment_method = 'cash' THEN total + COALESCE(sale_fee, 0) ELSE 0 END), 0) - COALESCE((SELECT SUM(refund_value) FROM warranty_claims wc WHERE wc.payment_method='cash' AND wc.action='REFUND' AND substr(wc.action_at,1,7)=?),0) AS cash_sales_amount,
                 COUNT(DISTINCT CASE WHEN payment_method = 'card' THEN transaction_id END) AS card_sales_count,
-                COALESCE(SUM(CASE WHEN payment_method = 'card' THEN total + COALESCE(sale_fee, 0) ELSE 0 END), 0) AS card_sales_amount,
+                COALESCE(SUM(CASE WHEN payment_method = 'card' THEN total + COALESCE(sale_fee, 0) ELSE 0 END), 0) - COALESCE((SELECT SUM(refund_value) FROM warranty_claims wc WHERE wc.payment_method='card' AND wc.action='REFUND' AND substr(wc.action_at,1,7)=?),0) AS card_sales_amount,
                 COUNT(DISTINCT transaction_id) AS total_sales_count,
                 COALESCE(SUM(total + COALESCE(sale_fee, 0)), 0) AS total_sales_amount,
                 COALESCE(SUM(quantity), 0) AS total_sales_units
             FROM sales
             WHERE substr(sold_at, 1, 7) = ?
-        """, (report_month,)).fetchone()
+        """, (report_month, report_month, report_month)).fetchone()
 
         cash_sales_count = int(sales_summary["cash_sales_count"] or 0)
         cash_sales_amount = float(sales_summary["cash_sales_amount"] or 0)
@@ -1200,13 +1229,14 @@ def save_receipt_document(receipt):
         items = receipt.get("items") or []
         cash_received = receipt.get("cash_received", None)
         change_amount = receipt.get("change", None)
+        receipt_token = str(receipt.get("receipt_token") or uuid.uuid4().hex + uuid.uuid4().hex)
 
         connection.execute("""
             INSERT OR REPLACE INTO receipt_documents
             (transaction_id, store_name, sold_at, payment_method,
              subtotal, sale_fee, total, cash_received, change_amount,
-             currency_json, items_json, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             currency_json, items_json, receipt_token, receipt_status, refund_total, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             transaction_id,
             store_name,
@@ -1219,6 +1249,9 @@ def save_receipt_document(receipt):
             None if change_amount is None else float(change_amount),
             json.dumps(currency, ensure_ascii=False),
             json.dumps(items, ensure_ascii=False),
+            receipt_token,
+            str(receipt.get("receipt_status") or "COMPLETED"),
+            float(receipt.get("refund_total") or 0),
             sold_at
         ))
         connection.commit()
@@ -1235,7 +1268,7 @@ def get_receipt_documents(limit=500):
         rows = connection.execute("""
             SELECT id, transaction_id, store_name, sold_at, payment_method,
                    subtotal, sale_fee, total, cash_received, change_amount,
-                   currency_json, items_json, created_at
+                   currency_json, items_json, receipt_token, receipt_status, refund_total, created_at
             FROM receipt_documents
             ORDER BY id DESC
             LIMIT ?
@@ -1263,7 +1296,7 @@ def get_receipt_document(transaction_id):
         row = connection.execute("""
             SELECT id, transaction_id, store_name, sold_at, payment_method,
                    subtotal, sale_fee, total, cash_received, change_amount,
-                   currency_json, items_json, created_at
+                   currency_json, items_json, receipt_token, receipt_status, refund_total, created_at
             FROM receipt_documents
             WHERE transaction_id = ?
         """, (str(transaction_id).strip(),)).fetchone()
@@ -1283,6 +1316,88 @@ def get_receipt_document(transaction_id):
         connection.close()
 
 
+
+def get_receipt_by_token(receipt_token):
+    connection = get_connection()
+    try:
+        row = connection.execute("SELECT * FROM receipt_documents WHERE receipt_token = ?", (str(receipt_token).strip(),)).fetchone()
+        if not row:
+            return None
+        item = dict(row)
+        for key, default in (("currency_json", {}), ("items_json", [])):
+            try: item[key[:-5] if key.endswith("_json") else key] = json.loads(item.pop(key) or json.dumps(default))
+            except Exception: item[key[:-5] if key.endswith("_json") else key] = default
+        return item
+    finally:
+        connection.close()
+
+
+def process_warranty_claim(receipt_token, product_id, quantity, action, device_time=None, replacement_product_id=None, reason=""):
+    action = str(action or "").upper().strip()
+    if action not in {"REFUND", "REPLACEMENT"}: raise ValueError("Invalid warranty action.")
+    quantity = int(quantity)
+    if quantity <= 0: raise ValueError("Quantity must be greater than zero.")
+    connection = get_connection(); cursor = connection.cursor()
+    try:
+        receipt = cursor.execute("SELECT * FROM receipt_documents WHERE receipt_token = ?", (str(receipt_token).strip(),)).fetchone()
+        if not receipt: raise ValueError("Receipt not found.")
+        items = json.loads(receipt["items_json"] or "[]")
+        target = next((i for i in items if int(i.get("product_id", -1)) == int(product_id)), None)
+        if not target: raise ValueError("Product is not on this receipt.")
+        already = cursor.execute("SELECT COALESCE(SUM(quantity),0) FROM warranty_claims WHERE receipt_token=? AND product_id=?", (receipt_token, product_id)).fetchone()[0]
+        if int(already or 0) + quantity > int(target.get("quantity") or 0): raise ValueError("Claim quantity exceeds the quantity on the receipt.")
+        warranty_days = int(target.get("warranty_days") or 0)
+        unit_value = float(target.get("unit_price") or 0) * quantity
+        sold_at = str(receipt["sold_at"])
+        expiry = target.get("warranty_expiry")
+        if warranty_days <= 0: raise ValueError("This product has no warranty.")
+        now = str(device_time or now_string()).strip()
+        try: expired = datetime.datetime.strptime(now, "%Y-%m-%d %H:%M:%S") > datetime.datetime.strptime(expiry, "%Y-%m-%d %H:%M:%S")
+        except Exception: expired = False
+        if expired: raise ValueError("Warranty has expired for this product.")
+        replacement = None
+        if action == "REPLACEMENT":
+            if replacement_product_id is None: raise ValueError("Select a replacement product.")
+            replacement = cursor.execute("SELECT id,name,stock,price FROM products WHERE id=? AND active=1", (int(replacement_product_id),)).fetchone()
+            if not replacement: raise ValueError("Replacement product not found.")
+            if int(replacement["stock"]) < quantity: raise ValueError("Not enough stock for the replacement product.")
+            before=int(replacement["stock"]); after=before-quantity
+            cursor.execute("UPDATE products SET stock=? WHERE id=?", (after, replacement["id"]))
+            cursor.execute("""INSERT INTO stock_movements (product_id,product_name,movement_type,stock_before,quantity_added,quantity_sold,adjustment,stock_after,reason,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)""", (replacement["id"],replacement["name"],"WARRANTY_REPLACEMENT",before,0,quantity,-quantity,after,"Replacement issued for receipt " + str(receipt["transaction_id"]),now))
+        # Returned goods never go back into sellable stock. Record the physical
+        # return as a DAMAGED movement without changing sellable stock.
+        current_product = cursor.execute("SELECT stock FROM products WHERE id=?", (target["product_id"],)).fetchone()
+        current_stock = int(current_product["stock"] or 0)
+        cursor.execute("""INSERT INTO stock_movements (product_id,product_name,movement_type,stock_before,quantity_added,quantity_sold,adjustment,stock_after,reason,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)""", (target["product_id"],target["name"],"DAMAGED_RETURN",current_stock,0,0,0,current_stock,"Warranty return - damaged goods - receipt " + str(receipt["transaction_id"]),now))
+        cursor.execute("""INSERT INTO warranty_claims (transaction_id,receipt_token,product_id,product_name,quantity,action,warranty_days,sold_at,expiry_at,action_at,replacement_product_id,replacement_product_name,replacement_quantity,refund_value,payment_method,reason) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (receipt["transaction_id"],receipt_token,target["product_id"],target["name"],quantity,action,warranty_days,sold_at,expiry,now,replacement["id"] if replacement else None,replacement["name"] if replacement else None,quantity if replacement else 0,unit_value if action=="REFUND" else 0,receipt["payment_method"],str(reason or "Warranty claim")))
+        # Update saved receipt item state permanently.
+        claimed = int(already or 0) + quantity
+        target["claimed_quantity"] = claimed
+        target["claim_status"] = "REFUNDED" if action == "REFUND" and claimed >= int(target.get("quantity") or 0) else ("REPLACED" if action == "REPLACEMENT" and claimed >= int(target.get("quantity") or 0) else "PARTIALLY REFUNDED" if action == "REFUND" else "PARTIALLY REPLACED")
+        target["last_claim_action"] = action
+        target["last_claim_at"] = now
+        target["warranty_status"] = target["claim_status"]
+        previous_refund = float(receipt["refund_total"] or 0)
+        new_refund = previous_refund + (unit_value if action == "REFUND" else 0)
+        receipt_status = "REFUNDED" if action == "REFUND" and claimed >= int(target.get("quantity") or 0) else ("REPLACED" if action == "REPLACEMENT" and claimed >= int(target.get("quantity") or 0) else "PARTIALLY REFUNDED" if action == "REFUND" else "PARTIALLY REPLACED")
+        cursor.execute("UPDATE receipt_documents SET items_json=?, receipt_status=?, refund_total=? WHERE transaction_id=?", (json.dumps(items, ensure_ascii=False), receipt_status, new_refund, receipt["transaction_id"]))
+        connection.commit()
+        return get_receipt_by_token(receipt_token)
+    except Exception:
+        connection.rollback(); raise
+    finally: connection.close()
+
+
+def get_warranty_claims(receipt_token=None, report_month=None):
+    connection=get_connection()
+    try:
+        if receipt_token:
+            rows=connection.execute("SELECT * FROM warranty_claims WHERE receipt_token=? ORDER BY id DESC",(receipt_token,)).fetchall()
+        else:
+            rows=connection.execute("SELECT * FROM warranty_claims WHERE substr(action_at,1,7)=? ORDER BY id",(report_month,)).fetchall()
+        return [dict(r) for r in rows]
+    finally: connection.close()
+
 def get_monthly_sales_summary():
     connection = get_connection()
     try:
@@ -1290,15 +1405,15 @@ def get_monthly_sales_summary():
         row = connection.execute("""
             SELECT
                 COUNT(DISTINCT CASE WHEN payment_method = 'cash' THEN transaction_id END) AS cash_sales_count,
-                COALESCE(SUM(CASE WHEN payment_method = 'cash' THEN total + COALESCE(sale_fee, 0) ELSE 0 END), 0) AS cash_sales_amount,
+                COALESCE(SUM(CASE WHEN payment_method = 'cash' THEN total + COALESCE(sale_fee, 0) ELSE 0 END), 0) - COALESCE((SELECT SUM(refund_value) FROM warranty_claims wc WHERE wc.payment_method='cash' AND wc.action='REFUND' AND substr(wc.action_at,1,7)=?),0) AS cash_sales_amount,
                 COUNT(DISTINCT CASE WHEN payment_method = 'card' THEN transaction_id END) AS card_sales_count,
-                COALESCE(SUM(CASE WHEN payment_method = 'card' THEN total + COALESCE(sale_fee, 0) ELSE 0 END), 0) AS card_sales_amount,
+                COALESCE(SUM(CASE WHEN payment_method = 'card' THEN total + COALESCE(sale_fee, 0) ELSE 0 END), 0) - COALESCE((SELECT SUM(refund_value) FROM warranty_claims wc WHERE wc.payment_method='card' AND wc.action='REFUND' AND substr(wc.action_at,1,7)=?),0) AS card_sales_amount,
                 COUNT(DISTINCT transaction_id) AS total_sales_count,
                 COALESCE(SUM(total + COALESCE(sale_fee, 0)), 0) AS total_sales_amount,
                 COALESCE(SUM(quantity), 0) AS total_sales_units
             FROM sales
             WHERE substr(sold_at, 1, 7) = ?
-        """, (report_month,)).fetchone()
+        """, (report_month, report_month, report_month)).fetchone()
 
         return {
             "report_month": report_month,
