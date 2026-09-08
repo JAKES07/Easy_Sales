@@ -23,6 +23,8 @@ from store_controller import (
     update_store_name,
     set_employee_mode_feature,
     reset_employee_mode_password,
+    set_restaurant_mode,
+    get_restaurant_mode,
 )
 
 from controller_auth import (
@@ -568,6 +570,30 @@ def reset_employee_mode_store_password(store_id):
         flash(str(error), "error")
     return redirect(url_for("controller.store_details", store_id=store_id.upper()))
 
+
+
+# ============================================================
+# RESTAURANT ADD-ON
+# ============================================================
+@controller_bp.route("/store/<store_id>/restaurant/enable", methods=["POST"])
+@controller_login_required
+def enable_restaurant_addon(store_id):
+    try:
+        set_restaurant_mode(store_id.upper(), True)
+        flash(f"Restaurant add-on enabled for {store_id.upper()}.", "success")
+    except Exception as error:
+        flash(str(error), "error")
+    return redirect(url_for("controller.store_details", store_id=store_id.upper()))
+
+@controller_bp.route("/store/<store_id>/restaurant/disable", methods=["POST"])
+@controller_login_required
+def disable_restaurant_addon(store_id):
+    try:
+        set_restaurant_mode(store_id.upper(), False)
+        flash(f"Restaurant add-on disabled for {store_id.upper()}.", "success")
+    except Exception as error:
+        flash(str(error), "error")
+    return redirect(url_for("controller.store_details", store_id=store_id.upper()))
 
 # ============================================================
 # VIEW STORE DETAILS
