@@ -17,6 +17,7 @@ from flask import (
     send_file
 )
 import sqlite3
+import qrcode
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -29,6 +30,9 @@ from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
     PageBreak, KeepTogether
 )
+from reportlab.graphics.shapes import Drawing
+from reportlab.graphics.barcode.qr import QrCodeWidget
+from reportlab.graphics import renderPDF
 
 from database import (
     create_database,
@@ -52,6 +56,9 @@ from database import (
     save_receipt_document,
     get_receipt_documents,
     get_receipt_document,
+    get_receipt_by_token,
+    process_warranty_claim,
+    get_warranty_claims,
     get_stock_report_data,
     get_connection,
     get_currency_settings,
@@ -543,6 +550,7 @@ def products():
     try:
         price = float(data.get("price"))
         stock = int(data.get("stock"))
+        warranty_days = int(data.get("warranty_days", 0) or 0)
     except (TypeError, ValueError):
         return jsonify({
             "success": False,
@@ -555,14 +563,14 @@ def products():
             "message": "Product name is required."
         }), 400
 
-    if price < 0 or stock < 0:
+    if price < 0 or stock < 0 or warranty_days < 0:
         return jsonify({
             "success": False,
             "message": "Price and stock cannot be negative."
         }), 400
 
     try:
-        product_id = add_product(name, price, stock, barcode)
+        product_id = add_product(name, price, stock, barcode, warranty_days)
         return jsonify({
             "success": True,
             "message": "Product saved successfully.",
@@ -702,6 +710,7 @@ def edit_product(product_id):
                 0
             )
         )
+        warranty_days = int(data.get("warranty_days", 0) or 0)
 
     except (
         ValueError,
@@ -733,7 +742,7 @@ def edit_product(product_id):
             )
         }), 400
 
-    if stock < 0:
+    if stock < 0 or warranty_days < 0:
 
         return jsonify({
             "success": False,
@@ -748,7 +757,8 @@ def edit_product(product_id):
             product_id,
             name,
             price,
-            stock
+            stock,
+            warranty_days
         )
 
         return jsonify({
@@ -903,7 +913,8 @@ def save_sale():
                 "cash_received": data.get("cash_received", None),
                 "change": data.get("change", None),
                 "currency": currency,
-                "items": result.get("items", [])
+                "items": result.get("items", []),
+                "receipt_token": result.get("receipt_token", "")
             })
         except Exception as archive_error:
             print("RECEIPT ARCHIVE WARNING:", archive_error)
@@ -924,6 +935,7 @@ def save_sale():
             "total": result["total"],
             "sold_at": result["sold_at"],
             "transaction_id": result.get("transaction_id", ""),
+            "receipt_token": result.get("receipt_token", ""),
             "items": result.get("items", []),
             "store_name": (get_store(session.get("store_id"))["store_name"] if get_store(session.get("store_id")) else session.get("store_name", "Easy Sales")),
             "currency": get_currency_settings() or {}
@@ -1557,18 +1569,35 @@ def build_receipt_pdf(data):
         unit_price = float(item.get("unit_price") or 0)
         story.append(Paragraph(f"{name} x {qty:g} &nbsp;&nbsp; {money(line_total)}", normal))
         story.append(Paragraph(f"{money(unit_price)} each", ParagraphStyle("ReceiptSmall", parent=normal, fontSize=7.5, leading=9)))
+        if int(item.get("warranty_days") or 0) > 0:
+            story.append(Paragraph(f"Warranty: {int(item.get('warranty_days'))} days | Expiry: {str(item.get('warranty_expiry') or '—')} | Status: {str(item.get('warranty_status') or 'ACTIVE')}", ParagraphStyle("ReceiptWarranty", parent=normal, fontSize=7, leading=8)))
+        elif item.get("warranty_status"):
+            story.append(Paragraph(f"Warranty: {str(item.get('warranty_status'))}", ParagraphStyle("ReceiptWarranty2", parent=normal, fontSize=7, leading=8)))
 
     story.append(Paragraph("-" * 42, center))
     story.append(Paragraph(f"Subtotal: {money(subtotal)}", normal))
     if sale_fee > 0:
         story.append(Paragraph(f"Sale Fee: {money(sale_fee)}", normal))
     story.append(Paragraph(f"TOTAL: {money(total)}", bold))
+    receipt_status = str(data.get("receipt_status") or "COMPLETED")
+    refund_total = float(data.get("refund_total") or 0)
+    if receipt_status != "COMPLETED": story.append(Paragraph(f"STATUS: {receipt_status}", bold))
+    if refund_total > 0: story.append(Paragraph(f"Refunded: {money(refund_total)}", normal))
     story.append(Paragraph(f"Payment: {payment_method}", normal))
     if cash_received is not None:
         story.append(Paragraph(f"Cash: {money(cash_received)}", normal))
         story.append(Paragraph(f"Change: {money(change)}", normal))
     story.append(Paragraph("-" * 42, center))
-    story.append(Spacer(1, 1 * mm))
+    receipt_token = str(data.get("receipt_token") or "").strip()
+    if receipt_token:
+        qr = QrCodeWidget("ESQR:" + receipt_token)
+        qr.barWidth = 28 * mm
+        qr.barHeight = 28 * mm
+        drawing = Drawing(28 * mm, 28 * mm)
+        drawing.add(qr)
+        story.append(drawing)
+        story.append(Paragraph("SCAN FOR RECEIPT / WARRANTY", center))
+        story.append(Spacer(1, 1 * mm))
     story.append(Paragraph("Thank you!", center))
     story.append(Paragraph("Powered by Easy_Sales", center))
     if currency_code:
@@ -1599,6 +1628,53 @@ def receipt_documents():
     except Exception as error:
         print("RECEIPT DOCUMENTS ERROR:", error)
         return jsonify({"success": False, "message": "Could not load receipt documents."}), 500
+
+
+@app.route("/api/receipt/qr/<receipt_token>.png", methods=["GET"])
+def receipt_qr_png(receipt_token):
+    try:
+        receipt = get_receipt_by_token(receipt_token)
+        if not receipt:
+            return jsonify({"success": False, "message": "Receipt not found."}), 404
+        image = qrcode.make("ESQR:" + str(receipt_token))
+        buffer = BytesIO(); image.save(buffer, format="PNG"); buffer.seek(0)
+        return send_file(buffer, mimetype="image/png", max_age=0)
+    except Exception as error:
+        print("RECEIPT QR IMAGE ERROR:", error)
+        return jsonify({"success": False, "message": "Could not generate receipt QR."}), 500
+
+
+@app.route("/api/receipt/lookup/<receipt_token>", methods=["GET"])
+def receipt_lookup(receipt_token):
+    try:
+        receipt = get_receipt_by_token(receipt_token)
+        if not receipt:
+            return jsonify({"success": False, "message": "Receipt QR code is not recognised."}), 404
+        return jsonify({"success": True, "receipt": receipt, "claims": get_warranty_claims(receipt_token=receipt_token)})
+    except Exception as error:
+        print("RECEIPT QR LOOKUP ERROR:", error)
+        return jsonify({"success": False, "message": "Could not read this receipt."}), 500
+
+
+@app.route("/api/receipt/<receipt_token>/warranty-claim", methods=["POST"])
+def warranty_claim(receipt_token):
+    data = request.get_json(silent=True) or {}
+    try:
+        receipt = process_warranty_claim(
+            receipt_token,
+            int(data.get("product_id")),
+            int(data.get("quantity", 1)),
+            data.get("action"),
+            str(data.get("device_time") or "").strip() or None,
+            int(data.get("replacement_product_id")) if data.get("replacement_product_id") not in (None, "", 0, "null") else None,
+            str(data.get("reason") or "Warranty claim")
+        )
+        return jsonify({"success": True, "message": "Warranty action recorded.", "receipt": receipt, "claims": get_warranty_claims(receipt_token=receipt_token)})
+    except ValueError as error:
+        return jsonify({"success": False, "message": str(error)}), 400
+    except Exception as error:
+        print("WARRANTY CLAIM ERROR:", error)
+        return jsonify({"success": False, "message": "Could not record warranty action."}), 500
 
 
 @app.route("/api/receipt-documents/<transaction_id>/pdf", methods=["GET"])
