@@ -3277,3 +3277,16 @@ button:active {
 .employee-mode-window {
     z-index: 10050;
 }
+
+
+/* Saved receipt PDF archive */
+.receipt-document-list{display:flex;flex-direction:column;gap:12px;margin-top:12px;}
+.receipt-document-card{background:#fff;border-radius:14px;padding:14px;border:1px solid #ddd;box-shadow:0 2px 7px rgba(0,0,0,.06);}
+.receipt-document-header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;}
+.receipt-document-header div{display:flex;flex-direction:column;gap:4px;}
+.receipt-document-header strong{font-size:16px;}
+.receipt-document-header span{font-size:13px;color:#666;}
+.receipt-document-meta{display:flex;gap:16px;flex-wrap:wrap;margin:10px 0;color:#555;font-size:13px;}
+.receipt-document-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.receipt-document-actions button{border:0;border-radius:9px;padding:11px 8px;background:#222;color:#fff;font-weight:700;cursor:pointer;}
+@media(max-width:520px){.receipt-document-actions{grid-template-columns:1fr;}}
