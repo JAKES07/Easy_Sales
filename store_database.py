@@ -193,6 +193,7 @@ def create_store_database(store_id):
                 price REAL NOT NULL,
                 stock INTEGER NOT NULL DEFAULT 0,
                 barcode TEXT UNIQUE,
+                warranty_days INTEGER NOT NULL DEFAULT 0,
                 active INTEGER NOT NULL DEFAULT 1
             )
         """)
@@ -295,7 +296,34 @@ def create_store_database(store_id):
                 change_amount REAL,
                 currency_json TEXT NOT NULL DEFAULT '{}',
                 items_json TEXT NOT NULL DEFAULT '[]',
+                receipt_token TEXT,
+                receipt_status TEXT NOT NULL DEFAULT 'COMPLETED',
+                refund_total REAL NOT NULL DEFAULT 0,
                 created_at TEXT NOT NULL
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS warranty_claims (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                transaction_id TEXT NOT NULL,
+                receipt_token TEXT NOT NULL,
+                product_id INTEGER NOT NULL,
+                product_name TEXT NOT NULL,
+                quantity INTEGER NOT NULL,
+                action TEXT NOT NULL,
+                warranty_days INTEGER NOT NULL DEFAULT 0,
+                sold_at TEXT NOT NULL,
+                expiry_at TEXT,
+                action_at TEXT NOT NULL,
+                replacement_product_id INTEGER,
+                replacement_product_name TEXT,
+                replacement_quantity INTEGER NOT NULL DEFAULT 0,
+                refund_value REAL NOT NULL DEFAULT 0,
+                payment_method TEXT,
+                reason TEXT,
+                FOREIGN KEY(product_id) REFERENCES products(id),
+                FOREIGN KEY(replacement_product_id) REFERENCES products(id)
             )
         """)
 
@@ -322,12 +350,11 @@ def create_store_database(store_id):
             "TEXT"
         )
 
-        _ensure_column(
-            cursor,
-            "products",
-            "barcode",
-            "TEXT"
-        )
+        _ensure_column(cursor, "products", "barcode", "TEXT")
+        _ensure_column(cursor, "products", "warranty_days", "INTEGER NOT NULL DEFAULT 0")
+        _ensure_column(cursor, "receipt_documents", "receipt_token", "TEXT")
+        _ensure_column(cursor, "receipt_documents", "receipt_status", "TEXT NOT NULL DEFAULT 'COMPLETED'")
+        _ensure_column(cursor, "receipt_documents", "refund_total", "REAL NOT NULL DEFAULT 0")
 
         _ensure_column(
             cursor,
