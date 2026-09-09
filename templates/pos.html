@@ -59,6 +59,16 @@
 </button>
 
 <button
+    id="restaurant-share-button"
+    class="top-left-scanner"
+    type="button"
+    style="display:none;">
+
+    📲 Share Restaurant
+
+</button>
+
+<button
     id="scanner-button"
     class="top-right-scanner"
     type="button">
@@ -928,8 +938,10 @@
      JAVASCRIPT
      ======================================================== -->
 
+<script>window.EASY_SALES_STORE_ID={{ store_id|tojson }};</script>
+
 <script
-    src="{{ url_for('static', filename='js/app.js') }}?v=restaurant-addon-3">
+    src="{{ url_for('static', filename='js/app.js') }}?v=restaurant-addon-4-share">
 </script>
 
 
