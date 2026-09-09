@@ -206,7 +206,9 @@ def customer_page(store_id):
 
 @restaurant_bp.route('/api/restaurant/bootstrap')
 def bootstrap():
-    store_id=request.args.get('store_id','').upper(); c=conn(store_id); init_restaurant_db(store_id)
+    store_id=request.args.get('store_id','').upper()
+    init_restaurant_db(store_id)
+    c=conn(store_id)
     ingredients=rowdicts(c.execute('SELECT * FROM restaurant_ingredients WHERE active=1 ORDER BY name').fetchall())
     menus=[build_menu(c,r) for r in c.execute('SELECT * FROM restaurant_menu WHERE active=1 ORDER BY category,name').fetchall()]
     for i in ingredients: i['base_unit_cost']=round(float(i['pack_cost'])/float(i['pack_quantity']),6) if i['pack_quantity'] else 0
