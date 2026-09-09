@@ -6444,3 +6444,38 @@ async function shareReceipt() {
         console.error('Restaurant add-on status error:',error);
     }
 })();
+
+// ============================================================
+// OWNER: SHARE CUSTOMER ONLINE ORDERING LINK
+// ============================================================
+(async function setupRestaurantShareButton(){
+    const button = document.getElementById("restaurant-share-button");
+    if (!button) return;
+
+    try {
+        const response = await fetch("/api/restaurant/status?ts=" + Date.now(), {
+            cache: "no-store",
+            headers: { "Cache-Control": "no-cache" }
+        });
+        const data = await response.json();
+        if (!(response.ok && data.success && data.enabled === true)) {
+            button.style.display = "none";
+            return;
+        }
+
+        button.style.display = "inline-flex";
+        button.onclick = function(){
+            const storeId = window.EASY_SALES_STORE_ID || "";
+            if (!storeId) {
+                alert("Store ID is not available.");
+                return;
+            }
+            const url = window.location.origin + "/r/" + encodeURIComponent(storeId);
+            const text = "Order online from Easy_Sales Restaurant: " + url;
+            window.location.href = "https://wa.me/?text=" + encodeURIComponent(text);
+        };
+    } catch (error) {
+        button.style.display = "none";
+        console.error("Restaurant share status error:", error);
+    }
+})();
