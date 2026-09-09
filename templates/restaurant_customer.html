@@ -1,131 +1,25 @@
 <!doctype html>
-<html>
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Order - Easy_Sales Restaurant</title>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Order - Easy_Sales Restaurant</title>
 <style>
-body{font-family:Arial,sans-serif;background:#f3f4f6;margin:0;color:#20252b}
-.wrap{max-width:700px;margin:auto;padding:16px}
-.card{background:#fff;border-radius:14px;padding:16px;margin:10px 0;box-shadow:0 2px 8px #0001}
-.btn{padding:12px 15px;border:0;border-radius:9px;background:#20252b;color:#fff;cursor:pointer;font-weight:700}
-.btn.green{background:#16803c}.btn.light{background:#e9ecef;color:#20252b}
-.food{display:flex;justify-content:space-between;align-items:center;gap:10px;border:1px solid #ddd;border-radius:9px;padding:12px;margin:7px 0}
-input{padding:11px;border:1px solid #ccc;border-radius:8px;width:100%;box-sizing:border-box;margin-bottom:10px}
-.share-row{display:flex;gap:8px;flex-wrap:wrap}.share-row .btn{flex:1;min-width:145px}
-#statusCard{display:none;border:2px solid #16803c;background:#eefaf2}.status-title{font-size:20px;font-weight:700}.status-message{margin-top:7px}.ready{font-size:22px;font-weight:800}
-.small{font-size:13px;color:#666}.receipt-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
-</style>
-</head>
-<body>
-<div class="wrap">
-  <div class="card">
-    <h1>🍔 {{store['store_name']}}</h1>
-    <p>Order ahead and pay at the cashier when you arrive.</p>
-    <div class="share-row">
-      <button class="btn green" id="sharePage">📲 Share Ordering via WhatsApp</button>
-    </div>
-    <p class="small">Share this restaurant with friends and family so they can order from their phone.</p>
-  </div>
-
-  <div class="card"><h2>Menu</h2><div id="menu"></div></div>
-
-  <div class="card">
-    <h2>Your order</h2>
-    <input id="name" placeholder="Name (optional)">
-    <div id="cart"></div>
-    <h3>Total: <span id="total">R0.00</span></h3>
-    <button class="btn green" id="send">PLACE ORDER — PAY AT CASHIER</button>
-  </div>
-
-  <div id="statusCard" class="card" aria-live="polite">
-    <div class="status-title" id="statusTitle">Order status</div>
-    <div id="statusMessage" class="status-message">Waiting for an update...</div>
-    <div class="small" id="statusNumber"></div>
-  </div>
-
-  <div id="result"></div>
+body{font-family:Arial,sans-serif;background:#f3f4f6;margin:0;color:#20252b}.wrap{max-width:700px;margin:auto;padding:12px}.card{background:#fff;border-radius:16px;padding:17px;margin:10px 0;box-shadow:0 2px 9px #0001}.brand{text-align:center}.brand img{width:100px;height:100px;object-fit:contain}.brand h1{font-size:28px;margin:5px 0 8px}.btn{padding:13px 15px;border:0;border-radius:12px;background:#20252b;color:#fff;cursor:pointer;font-weight:800}.btn.green{background:#16803c}.share-row{display:flex;gap:8px}.share-row .btn{width:100%}.food{display:flex;justify-content:space-between;align-items:center;gap:12px;border:1px solid #ddd;border-radius:14px;padding:13px;margin:8px 0;background:#fff}.food-info{display:flex;align-items:center;gap:10px}.food-emoji{font-size:27px}.food-name{font-size:18px;font-weight:800}.food-price{color:#16803c;font-weight:800;margin-top:3px}.add{min-width:76px}.category{font-size:22px;margin:20px 0 8px;display:flex;align-items:center;gap:8px}.category:first-child{margin-top:0}.category-count{font-size:12px;color:#16803c;background:#eefaf2;border-radius:999px;padding:5px 9px}.small{font-size:13px;color:#666}.input{padding:12px;border:1px solid #ccc;border-radius:10px;width:100%;box-sizing:border-box;margin-bottom:10px}.cart-line{display:flex;justify-content:space-between;border-bottom:1px solid #eee;padding:8px 0}.total{font-size:21px;font-weight:800}.status{display:none;border:2px solid #16803c;background:#eefaf2}.ready{font-size:24px;font-weight:900}.receipt-row{margin-top:12px}.notice{padding:10px;border-radius:10px;background:#fff4d6;color:#684e00;margin-top:10px}
+</style></head><body><div class="wrap">
+<div class="card brand"><img src="{{ url_for('static', filename='images/logo.png') }}" alt="Easy_Sales"><h1>🍔 {{store['store_name']}}</h1><p>Order ahead and pay at the cashier when you arrive.</p><div class="share-row"><button class="btn green" id="sharePage">📲 Share Ordering via WhatsApp</button></div><p class="small">Share this restaurant with friends and family so they can order from their phone.</p></div>
+<div class="card"><h2>📋 Menu</h2><div id="menu"></div></div>
+<div class="card"><h2>🛒 Your Order</h2><input id="name" class="input" placeholder="Name (optional)"><div id="cart"></div><p class="total">Total: <span id="total">R0.00</span></p><button class="btn green" id="send">PLACE ORDER — PAY AT CASHIER</button></div>
+<div id="statusCard" class="card status" aria-live="polite"><div class="ready" id="statusTitle">Order status</div><div id="statusMessage">Waiting for an update...</div><div class="small" id="statusNumber"></div></div><div id="result"></div>
 </div>
-
 <script>
-const STORE={{store_id|tojson}};
-const CUSTOMER_URL=window.location.origin+'/r/'+encodeURIComponent(STORE);
-let menus=[],cart=[],trackingToken=null,lastStatus=null,statusTimer=null;
-const money=v=>'R'+Number(v||0).toFixed(2);
-
-async function load(){
-  const r=await fetch('/api/restaurant/bootstrap?store_id='+encodeURIComponent(STORE),{cache:'no-store'});
-  const j=await r.json();
-  menus=j.menus||[];
-  document.getElementById('menu').innerHTML=menus.map(m=>`<div class="food"><span><b>${esc(m.name)}</b><br>${esc(m.category)}<br>${money(m.selling_price)}</span><button class="btn" onclick="add(${m.id})">ADD</button></div>`).join('')||'<p>No menu items are available.</p>';
-}
+const STORE={{store_id|tojson}};const CUSTOMER_URL=window.location.origin+'/r/'+encodeURIComponent(STORE);let menus=[],cart=[],trackingToken=null,lastStatus=null,statusTimer=null;const money=v=>'R'+Number(v||0).toFixed(2);const categoryEmoji={burgers:'🍔',chicken:'🍗',pizza:'🍕',drinks:'🥤',desserts:'🍰',sides:'🍟',breakfast:'🍳',seafood:'🐟',steak:'🥩',snacks:'🍿',salads:'🥗',sandwiches:'🥪',general:'🍽️'};function catEmoji(c){return categoryEmoji[String(c||'General').trim().toLowerCase()]||'🍽️'}
+async function load(){try{const r=await fetch('/api/restaurant/bootstrap?store_id='+encodeURIComponent(STORE),{cache:'no-store'});const j=await r.json();if(!r.ok||!j.success)throw Error(j.message||'Menu could not be loaded.');menus=j.menus||[];renderMenu()}catch(e){document.getElementById('menu').innerHTML='<p>⚠️ '+esc(e.message)+'</p>'}}
+function grouped(){const g={};menus.forEach(m=>{const c=(m.category||'General').trim()||'General';(g[c]??=[]).push(m)});return g}
+function renderMenu(){const groups=grouped();document.getElementById('menu').innerHTML=Object.entries(groups).map(([cat,items])=>`<div class="category"><span>${catEmoji(cat)}</span><strong>${esc(cat)}</strong><span class="category-count">${items.length} item${items.length===1?'':'s'}</span></div>${items.map(m=>`<div class="food"><div class="food-info"><span class="food-emoji">${catEmoji(cat)}</span><div><div class="food-name">${esc(m.name)}</div><div class="food-price">${money(m.selling_price)}</div></div></div><button class="btn add" onclick="add(${m.id})">ADD</button></div>`).join('')}`).join('')||'<p>No menu items are available.</p>'}
 function add(id){let m=menus.find(x=>x.id===id),x=cart.find(x=>x.id===id);if(!m)return;if(x)x.qty++;else cart.push({id:m.id,name:m.name,price:m.selling_price,qty:1});render()}
-function render(){document.getElementById('cart').innerHTML=cart.map(x=>`<div>${esc(x.name)} × ${x.qty} — ${money(x.qty*x.price)}</div>`).join('')||'No items yet';document.getElementById('total').textContent=money(cart.reduce((a,x)=>a+x.qty*x.price,0))}
-
-function shareOrderingPage(){
-  const text=`Order online from ${STORE}: ${CUSTOMER_URL}`;
-  const wa='https://wa.me/?text='+encodeURIComponent(text);
-  window.location.href=wa;
-}
+function render(){document.getElementById('cart').innerHTML=cart.map((x,i)=>`<div class="cart-line"><span>${esc(x.name)} × ${x.qty}</span><span>${money(x.qty*x.price)} <button class="btn" onclick="cart.splice(${i},1);render()">−</button></span></div>`).join('')||'<p class="small">No items yet.</p>';document.getElementById('total').textContent=money(cart.reduce((a,x)=>a+x.qty*x.price,0))}
+function shareOrderingPage(){const text=`🍔 Order online from ${escPlain({{store['store_name']|tojson}})}: ${CUSTOMER_URL}`;window.location.href='https://wa.me/?text='+encodeURIComponent(text)}
 document.getElementById('sharePage').onclick=shareOrderingPage;
-
-async function downloadReceipt(token){
-  try{
-    const r=await fetch('/api/restaurant/online-order/receipt?store_id='+encodeURIComponent(STORE)+'&token='+encodeURIComponent(token),{cache:'no-store'});
-    if(!r.ok)throw new Error('Receipt could not be created.');
-    const blob=await r.blob();
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement('a');
-    a.href=url;a.download='Easy_Sales_Online_Order_Receipt.pdf';
-    document.body.appendChild(a);a.click();a.remove();
-    setTimeout(()=>URL.revokeObjectURL(url),3000);
-  }catch(e){console.error('Receipt download error',e)}
-}
-
-function showStatus(order,message){
-  const card=document.getElementById('statusCard');
-  card.style.display='block';
-  document.getElementById('statusNumber').textContent='Order '+order.order_number;
-  const title=document.getElementById('statusTitle');
-  title.textContent=order.status==='READY'?'🎉 Your food is ready!':'Order status: '+order.status;
-  title.className=order.status==='READY'?'status-title ready':'status-title';
-  document.getElementById('statusMessage').textContent=message;
-  if(order.status==='READY' && lastStatus!=='READY'){
-    try{if(navigator.vibrate)navigator.vibrate([250,120,250])}catch(e){}
-    alert('🎉 Your food is ready! Please collect order '+order.order_number+'.');
-  }
-  lastStatus=order.status;
-}
-
-async function pollStatus(){
-  if(!trackingToken)return;
-  try{
-    const r=await fetch('/api/restaurant/online-order/status?store_id='+encodeURIComponent(STORE)+'&token='+encodeURIComponent(trackingToken)+'&t='+Date.now(),{cache:'no-store'});
-    const j=await r.json();
-    if(r.ok&&j.success){showStatus(j.order,j.message);if(['COLLECTED','CANCELLED'].includes(j.order.status)){clearInterval(statusTimer);statusTimer=null}}
-  }catch(e){console.error('Order status error',e)}
-}
-
-async function placeOrder(){
-  if(!cart.length)return alert('Choose something first.');
-  const button=document.getElementById('send');button.disabled=true;button.textContent='PLACING ORDER...';
-  try{
-    const r=await fetch('/api/restaurant/orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({store_id:STORE,source:'ONLINE',customer_name:document.getElementById('name').value,items:cart.map(x=>({menu_id:x.id,quantity:x.qty}))})});
-    const j=await r.json();
-    if(!r.ok||!j.success)throw new Error(j.message||'Could not place order.');
-    trackingToken=j.customer_token;lastStatus=null;
-    document.getElementById('result').innerHTML=`<div class="card"><h2>Order received</h2><h1>${esc(j.order_number)}</h1><p>Total: <b>${money(j.total)}</b></p><p>Pay at the cashier. Keep this page open to receive live messages when your order is being prepared and when it is ready.</p><div class="receipt-row"><button class="btn green" id="receiptBtn">📄 Download PDF Receipt</button></div></div>`;
-    document.getElementById('receiptBtn').onclick=()=>downloadReceipt(trackingToken);
-    cart=[];render();
-    await downloadReceipt(trackingToken);
-    await pollStatus();
-    if(statusTimer)clearInterval(statusTimer);
-    statusTimer=setInterval(pollStatus,5000);
-  }catch(e){alert(e.message)}finally{button.disabled=false;button.textContent='PLACE ORDER — PAY AT CASHIER'}
-}
-document.getElementById('send').onclick=placeOrder;
-function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-load();render();
-</script>
-</body>
-</html>
+async function downloadReceipt(token){try{const r=await fetch('/api/restaurant/online-order/receipt?store_id='+encodeURIComponent(STORE)+'&token='+encodeURIComponent(token),{cache:'no-store'});if(!r.ok)throw Error('Receipt could not be created.');const blob=await r.blob();const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='Easy_Sales_Online_Order_Receipt.pdf';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),3000)}catch(e){console.error('Receipt download error',e)}}
+function showStatus(order,message){const card=document.getElementById('statusCard');card.style.display='block';document.getElementById('statusNumber').textContent='Order '+order.order_number;const title=document.getElementById('statusTitle');title.textContent=order.status==='READY'?'🎉 Your food is ready!':'Order status: '+order.status;title.className=order.status==='READY'?'ready':'';document.getElementById('statusMessage').textContent=message;if(order.status==='READY'&&lastStatus!=='READY'){try{if(navigator.vibrate)navigator.vibrate([250,120,250])}catch(e){}alert('🎉 Your food is ready! Please collect order '+order.order_number+'.')}lastStatus=order.status}
+async function pollStatus(){if(!trackingToken)return;try{const r=await fetch('/api/restaurant/online-order/status?store_id='+encodeURIComponent(STORE)+'&token='+encodeURIComponent(trackingToken)+'&t='+Date.now(),{cache:'no-store'});const j=await r.json();if(r.ok&&j.success){showStatus(j.order,j.message);if(['COLLECTED','CANCELLED'].includes(j.order.status)){clearInterval(statusTimer);statusTimer=null}}}catch(e){console.error('Order status error',e)}}
+async function placeOrder(){if(!cart.length)return alert('Choose something first.');const button=document.getElementById('send');button.disabled=true;button.textContent='PLACING ORDER...';try{const r=await fetch('/api/restaurant/orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({store_id:STORE,source:'ONLINE',customer_name:document.getElementById('name').value,items:cart.map(x=>({menu_id:x.id,quantity:x.qty}))})});const j=await r.json();if(!r.ok||!j.success)throw Error(j.message||'Could not place order.');trackingToken=j.customer_token;lastStatus=null;document.getElementById('result').innerHTML=`<div class="card"><h2>✅ Order received</h2><h1>${esc(j.order_number)}</h1><p>Total: <b>${money(j.total)}</b></p><p>Pay at the cashier. Keep this page open for live order updates.</p><div class="receipt-row"><button class="btn green" id="receiptBtn">📄 Download PDF Receipt</button></div><div class="notice">🔔 Keep this page open. You will be alerted here when your food is ready.</div></div>`;document.getElementById('receiptBtn').onclick=()=>downloadReceipt(trackingToken);cart=[];render();await downloadReceipt(trackingToken);await pollStatus();if(statusTimer)clearInterval(statusTimer);statusTimer=setInterval(pollStatus,5000)}catch(e){alert(e.message)}finally{button.disabled=false;button.textContent='PLACE ORDER — PAY AT CASHIER'}}
+document.getElementById('send').onclick=placeOrder;function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}function escPlain(s){return String(s??'')}load();render();
+</script></body></html>
