@@ -433,85 +433,76 @@ def store_database_exists(store_id):
 # ============================================================
 
 def reset_store_data(store_id):
+    """Safely clear one store's business data without deleting the store account.
+
+    Older store databases may not have Restaurant tables yet.  The controller
+    reset must work for every store, so initialise the Restaurant schema first
+    and then delete child rows before parent rows to respect foreign keys.
+    Default Restaurant categories are intentionally preserved because they are
+    system categories that products are placed under.
+    """
 
     store_id = _clean_store_id(store_id)
 
+    # Make sure all current tables exist before attempting the reset.  This is
+    # especially important for stores created before the Restaurant add-on.
     create_store_database(store_id)
+    try:
+        from restaurant import init_restaurant_db
+        init_restaurant_db(store_id)
+    except Exception as error:
+        raise RuntimeError(
+            f"Could not prepare the store database for reset: {error}"
+        )
 
-    connection = get_store_connection(
-        store_id
-    )
-
+    connection = get_store_connection(store_id)
     cursor = connection.cursor()
 
     try:
-
-        cursor.execute(
-            "DELETE FROM receipt_documents"
-        )
-
-        # Restaurant add-on records are isolated from the main shop records.
-        # A full store reset clears the restaurant world as well.
+        # Delete dependent rows first because foreign keys are enabled.
         for table in (
+            "receipt_documents",
+            "warranty_claims",
+            "monthly_report_items",
+            "stock_takes",
+            "stock_movements",
+            "sales",
             "restaurant_stock_movements",
+            "restaurant_recipe_items",
             "restaurant_order_items",
             "restaurant_orders",
-            "restaurant_recipe_items",
+        ):
+            cursor.execute(f"DELETE FROM {table}")
+
+        # Then delete the parent business data.
+        for table in (
+            "monthly_reports",
+            "products",
             "restaurant_menu",
             "restaurant_ingredients",
             "restaurant_expenses",
         ):
             cursor.execute(f"DELETE FROM {table}")
 
+        # Keep restaurant_categories: these are the built-in system categories
+        # and should still be available when the store starts adding products.
 
-        cursor.execute(
-            "DELETE FROM monthly_report_items"
-        )
-
-        cursor.execute(
-            "DELETE FROM monthly_reports"
-        )
-
-        cursor.execute(
-            "DELETE FROM stock_takes"
-        )
-
-        cursor.execute(
-            "DELETE FROM stock_movements"
-        )
-
-        cursor.execute(
-            "DELETE FROM sales"
-        )
-
-        cursor.execute(
-            "DELETE FROM products"
-        )
-
-        # Reset the store currency too. On the next store login,
-        # Easy Sales will show the currency setup popup again so the
-        # freshly reset store can choose its operating currency.
-        cursor.execute(
-            "DELETE FROM store_settings"
-        )
+        # Reset store settings/currency so the store can configure them again.
+        cursor.execute("DELETE FROM store_settings")
 
         connection.commit()
 
         return {
             "success": True,
             "store_id": store_id,
-            "message": (
-                "Store data reset successfully."
-            )
+            "message": "Store data reset successfully."
         }
 
     except Exception:
-
         connection.rollback()
         raise
 
     finally:
-
         connection.close()
 
 
