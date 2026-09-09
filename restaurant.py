@@ -241,7 +241,9 @@ def customer_page(store_id):
 
 @restaurant_bp.route('/api/restaurant/bootstrap')
 def bootstrap():
-    store_id=request.args.get('store_id','').upper()
+    store_id=str(request.args.get('store_id','')).strip().upper()
+    if not store_id or not enabled(store_id):
+        return jsonify({'success':False,'message':'Restaurant ordering is not available for this store.'}),404
     init_restaurant_db(store_id)
     c=conn(store_id)
     ingredients=rowdicts(c.execute('SELECT * FROM restaurant_ingredients WHERE active=1 ORDER BY name').fetchall())
