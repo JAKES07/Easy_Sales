@@ -24,9 +24,8 @@ input{padding:11px;border:1px solid #ccc;border-radius:8px;width:100%;box-sizing
     <p>Order ahead and pay at the cashier when you arrive.</p>
     <div class="share-row">
       <button class="btn green" id="sharePage">📲 Share Ordering via WhatsApp</button>
-      <button class="btn light" id="copyPage">🔗 Copy Ordering Link</button>
     </div>
-    <p class="small">Share this page with customers so they can order from their phone.</p>
+    <p class="small">Share this restaurant with friends and family so they can order from their phone.</p>
   </div>
 
   <div class="card"><h2>Menu</h2><div id="menu"></div></div>
@@ -63,16 +62,12 @@ async function load(){
 function add(id){let m=menus.find(x=>x.id===id),x=cart.find(x=>x.id===id);if(!m)return;if(x)x.qty++;else cart.push({id:m.id,name:m.name,price:m.selling_price,qty:1});render()}
 function render(){document.getElementById('cart').innerHTML=cart.map(x=>`<div>${esc(x.name)} × ${x.qty} — ${money(x.qty*x.price)}</div>`).join('')||'No items yet';document.getElementById('total').textContent=money(cart.reduce((a,x)=>a+x.qty*x.price,0))}
 
-async function shareOrderingPage(){
+function shareOrderingPage(){
   const text=`Order online from ${STORE}: ${CUSTOMER_URL}`;
   const wa='https://wa.me/?text='+encodeURIComponent(text);
-  window.open(wa,'_blank');
-}
-async function copyOrderingPage(){
-  try{await navigator.clipboard.writeText(CUSTOMER_URL);alert('Customer ordering link copied.')}catch(e){prompt('Copy this customer ordering link:',CUSTOMER_URL)}
+  window.location.href=wa;
 }
 document.getElementById('sharePage').onclick=shareOrderingPage;
-document.getElementById('copyPage').onclick=copyOrderingPage;
 
 async function downloadReceipt(token){
   try{
