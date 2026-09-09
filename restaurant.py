@@ -65,6 +65,13 @@ def init_restaurant_db(store_id):
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS restaurant_categories (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE,
+      emoji TEXT NOT NULL,
+      display_order INTEGER NOT NULL DEFAULT 0,
+      active INTEGER NOT NULL DEFAULT 1
+    );
     CREATE TABLE IF NOT EXISTS restaurant_recipe_items (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       menu_id INTEGER NOT NULL,
@@ -115,6 +122,34 @@ def init_restaurant_db(store_id):
       FOREIGN KEY(ingredient_id) REFERENCES restaurant_ingredients(id)
     );
     ''')
+    # Every store gets the same built-in restaurant categories. Products are
+    # added underneath these categories; existing stores are upgraded here too.
+    default_categories = [
+        ('Russian', '🌭'),
+        ('Burger', '🍔'),
+        ('Fish', '🐟'),
+        ('Quta', '🥪'),
+        ('Chicken', '🍗'),
+        ('Chips', '🍟'),
+        ('Meals', '🍽️'),
+        ('Ribs', '🍖'),
+        ('Pork', '🥩'),
+        ('Beef', '🥩'),
+        ('Pap', '🥣'),
+        ('Rice', '🍚'),
+        ('Salad', '🥗'),
+        ('Ice cream', '🍦'),
+    ]
+    for order, (name, emoji) in enumerate(default_categories, 1):
+        c.execute(
+            "INSERT OR IGNORE INTO restaurant_categories(name,emoji,display_order,active) VALUES(?,?,?,1)",
+            (name, emoji, order)
+        )
+        c.execute(
+            "UPDATE restaurant_categories SET emoji=?,display_order=?,active=1 WHERE name=?",
+            (emoji, order, name)
+        )
+
     try:
         c.execute("ALTER TABLE restaurant_orders ADD COLUMN stock_deducted INTEGER NOT NULL DEFAULT 0")
     except sqlite3.OperationalError:
@@ -210,9 +245,10 @@ def bootstrap():
     init_restaurant_db(store_id)
     c=conn(store_id)
     ingredients=rowdicts(c.execute('SELECT * FROM restaurant_ingredients WHERE active=1 ORDER BY name').fetchall())
+    categories=rowdicts(c.execute('SELECT id,name,emoji,display_order FROM restaurant_categories WHERE active=1 ORDER BY display_order').fetchall())
     menus=[build_menu(c,r) for r in c.execute('SELECT * FROM restaurant_menu WHERE active=1 ORDER BY category,name').fetchall()]
     for i in ingredients: i['base_unit_cost']=round(float(i['pack_cost'])/float(i['pack_quantity']),6) if i['pack_quantity'] else 0
-    c.close(); return jsonify({'success':True,'ingredients':ingredients,'menus':menus})
+    c.close(); return jsonify({'success':True,'ingredients':ingredients,'categories':categories,'menus':menus})
 
 @restaurant_bp.route('/api/restaurant/ingredients',methods=['POST'])
 def add_ingredient():
