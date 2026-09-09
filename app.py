@@ -425,6 +425,37 @@ def enforce_store_access():
     ):
         return None
 
+    # ------------------------------------------------------------
+    # PUBLIC RESTAURANT CUSTOMER ORDERING
+    # ------------------------------------------------------------
+    # Customer ordering uses a public /r/<STORE_ID> page. A customer
+    # must NOT need the owner's Store Access session just to view a
+    # menu, place an online order, track that order, or download its
+    # receipt. The restaurant routes still validate the supplied Store ID
+    # and Restaurant Mode before opening that store's database.
+    if request.path.startswith("/r/"):
+        return None
+
+    if request.path == "/api/restaurant/bootstrap":
+        return None
+
+    if request.path in (
+        "/api/restaurant/online-order/status",
+        "/api/restaurant/online-order/receipt"
+    ):
+        return None
+
+    # The shared orders endpoint is also used by the owner POS. Only an
+    # ONLINE order may use the endpoint without an owner Store Access
+    # session. GET remains protected for owners only.
+    if (
+        request.path == "/api/restaurant/orders"
+        and request.method == "POST"
+    ):
+        public_order = request.get_json(silent=True) or {}
+        if str(public_order.get("source") or "").upper() == "ONLINE":
+            return None
+
     # Only POS home page and POS API are protected here.
     if (
         request.path != "/"
