@@ -3142,6 +3142,35 @@ button:active {
 }
 
 
+
+/* ============================================================
+   POS SCANNER ROUND CANCEL BUTTON
+   ============================================================ */
+#close-pos-scanner,
+.scanner-round-close {
+    width: 46px;
+    min-width: 46px;
+    height: 46px;
+    min-height: 46px;
+    padding: 0;
+    border: 2px solid #ffffff;
+    border-radius: 50%;
+    background: #ffffff;
+    color: #222222;
+    font-size: 30px;
+    font-weight: 700;
+    line-height: 42px;
+    text-align: center;
+    cursor: pointer;
+    flex: 0 0 auto;
+    touch-action: manipulation;
+    box-shadow: 0 2px 8px rgba(0,0,0,.25);
+}
+#close-pos-scanner:active,
+.scanner-round-close:active {
+    transform: scale(.92);
+}
+
 /* ============================================================
    RECEIPT QR SCANNER EXIT BUTTON
    ============================================================ */
