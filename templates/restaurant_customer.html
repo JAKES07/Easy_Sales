@@ -1,1 +1,136 @@
-<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Order - Easy_Sales Restaurant</title><style>body{font-family:Arial;background:#f3f4f6;margin:0}.wrap{max-width:700px;margin:auto;padding:16px}.card{background:#fff;border-radius:12px;padding:15px;margin:10px 0}.btn{padding:12px;border:0;border-radius:8px;background:#20252b;color:#fff}.food{display:flex;justify-content:space-between;align-items:center;border:1px solid #ddd;border-radius:8px;padding:12px;margin:7px 0}input{padding:11px;border:1px solid #ccc;border-radius:7px;width:100%;box-sizing:border-box}</style></head><body><div class="wrap"><div class="card"><h1>🍔 {{store['store_name']}}</h1><p>Order ahead and pay at the cashier when you arrive.</p></div><div class="card"><h2>Menu</h2><div id="menu"></div></div><div class="card"><h2>Your order</h2><input id="name" placeholder="Name (optional)"><div id="cart"></div><h3>Total: <span id="total">R0.00</span></h3><button class="btn" id="send">PLACE ORDER — PAY AT CASHIER</button></div><div id="result"></div></div><script>const STORE={{store_id|tojson}};let menus=[],cart=[];const money=v=>'R'+Number(v||0).toFixed(2);async function load(){const r=await fetch('/api/restaurant/bootstrap?store_id='+STORE);const j=await r.json();menus=j.menus;document.getElementById('menu').innerHTML=menus.map(m=>`<div class="food"><span><b>${m.name}</b><br>${m.category}<br>${money(m.selling_price)}</span><button class="btn" onclick="add(${m.id})">ADD</button></div>`).join('')}function add(id){let m=menus.find(x=>x.id===id),x=cart.find(x=>x.id===id);if(x)x.qty++;else cart.push({id:m.id,name:m.name,price:m.selling_price,qty:1});render()}function render(){document.getElementById('cart').innerHTML=cart.map(x=>`<div>${x.name} × ${x.qty} — ${money(x.qty*x.price)}</div>`).join('')||'No items yet';document.getElementById('total').textContent=money(cart.reduce((a,x)=>a+x.qty*x.price,0))}document.getElementById('send').onclick=async()=>{if(!cart.length)return alert('Choose something first.');const r=await fetch('/api/restaurant/orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({store_id:STORE,source:'ONLINE',customer_name:document.getElementById('name').value,items:cart.map(x=>({menu_id:x.id,quantity:x.qty}))})});const j=await r.json();if(!j.success)return alert(j.message);document.getElementById('result').innerHTML=`<div class="card"><h2>Order received</h2><h1>${j.order_number}</h1><p>Total: <b>${money(j.total)}</b></p><p>Show this order number at the cashier and pay. Your order will then be sent to the restaurant.</p></div>`;cart=[];render()};load()</script></body></html>
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Order - Easy_Sales Restaurant</title>
+<style>
+body{font-family:Arial,sans-serif;background:#f3f4f6;margin:0;color:#20252b}
+.wrap{max-width:700px;margin:auto;padding:16px}
+.card{background:#fff;border-radius:14px;padding:16px;margin:10px 0;box-shadow:0 2px 8px #0001}
+.btn{padding:12px 15px;border:0;border-radius:9px;background:#20252b;color:#fff;cursor:pointer;font-weight:700}
+.btn.green{background:#16803c}.btn.light{background:#e9ecef;color:#20252b}
+.food{display:flex;justify-content:space-between;align-items:center;gap:10px;border:1px solid #ddd;border-radius:9px;padding:12px;margin:7px 0}
+input{padding:11px;border:1px solid #ccc;border-radius:8px;width:100%;box-sizing:border-box;margin-bottom:10px}
+.share-row{display:flex;gap:8px;flex-wrap:wrap}.share-row .btn{flex:1;min-width:145px}
+#statusCard{display:none;border:2px solid #16803c;background:#eefaf2}.status-title{font-size:20px;font-weight:700}.status-message{margin-top:7px}.ready{font-size:22px;font-weight:800}
+.small{font-size:13px;color:#666}.receipt-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <h1>🍔 {{store['store_name']}}</h1>
+    <p>Order ahead and pay at the cashier when you arrive.</p>
+    <div class="share-row">
+      <button class="btn green" id="sharePage">📲 Share Ordering via WhatsApp</button>
+      <button class="btn light" id="copyPage">🔗 Copy Ordering Link</button>
+    </div>
+    <p class="small">Share this page with customers so they can order from their phone.</p>
+  </div>
+
+  <div class="card"><h2>Menu</h2><div id="menu"></div></div>
+
+  <div class="card">
+    <h2>Your order</h2>
+    <input id="name" placeholder="Name (optional)">
+    <div id="cart"></div>
+    <h3>Total: <span id="total">R0.00</span></h3>
+    <button class="btn green" id="send">PLACE ORDER — PAY AT CASHIER</button>
+  </div>
+
+  <div id="statusCard" class="card" aria-live="polite">
+    <div class="status-title" id="statusTitle">Order status</div>
+    <div id="statusMessage" class="status-message">Waiting for an update...</div>
+    <div class="small" id="statusNumber"></div>
+  </div>
+
+  <div id="result"></div>
+</div>
+
+<script>
+const STORE={{store_id|tojson}};
+const CUSTOMER_URL=window.location.origin+'/r/'+encodeURIComponent(STORE);
+let menus=[],cart=[],trackingToken=null,lastStatus=null,statusTimer=null;
+const money=v=>'R'+Number(v||0).toFixed(2);
+
+async function load(){
+  const r=await fetch('/api/restaurant/bootstrap?store_id='+encodeURIComponent(STORE),{cache:'no-store'});
+  const j=await r.json();
+  menus=j.menus||[];
+  document.getElementById('menu').innerHTML=menus.map(m=>`<div class="food"><span><b>${esc(m.name)}</b><br>${esc(m.category)}<br>${money(m.selling_price)}</span><button class="btn" onclick="add(${m.id})">ADD</button></div>`).join('')||'<p>No menu items are available.</p>';
+}
+function add(id){let m=menus.find(x=>x.id===id),x=cart.find(x=>x.id===id);if(!m)return;if(x)x.qty++;else cart.push({id:m.id,name:m.name,price:m.selling_price,qty:1});render()}
+function render(){document.getElementById('cart').innerHTML=cart.map(x=>`<div>${esc(x.name)} × ${x.qty} — ${money(x.qty*x.price)}</div>`).join('')||'No items yet';document.getElementById('total').textContent=money(cart.reduce((a,x)=>a+x.qty*x.price,0))}
+
+async function shareOrderingPage(){
+  const text=`Order online from ${STORE}: ${CUSTOMER_URL}`;
+  const wa='https://wa.me/?text='+encodeURIComponent(text);
+  window.open(wa,'_blank');
+}
+async function copyOrderingPage(){
+  try{await navigator.clipboard.writeText(CUSTOMER_URL);alert('Customer ordering link copied.')}catch(e){prompt('Copy this customer ordering link:',CUSTOMER_URL)}
+}
+document.getElementById('sharePage').onclick=shareOrderingPage;
+document.getElementById('copyPage').onclick=copyOrderingPage;
+
+async function downloadReceipt(token){
+  try{
+    const r=await fetch('/api/restaurant/online-order/receipt?store_id='+encodeURIComponent(STORE)+'&token='+encodeURIComponent(token),{cache:'no-store'});
+    if(!r.ok)throw new Error('Receipt could not be created.');
+    const blob=await r.blob();
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;a.download='Easy_Sales_Online_Order_Receipt.pdf';
+    document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),3000);
+  }catch(e){console.error('Receipt download error',e)}
+}
+
+function showStatus(order,message){
+  const card=document.getElementById('statusCard');
+  card.style.display='block';
+  document.getElementById('statusNumber').textContent='Order '+order.order_number;
+  const title=document.getElementById('statusTitle');
+  title.textContent=order.status==='READY'?'🎉 Your food is ready!':'Order status: '+order.status;
+  title.className=order.status==='READY'?'status-title ready':'status-title';
+  document.getElementById('statusMessage').textContent=message;
+  if(order.status==='READY' && lastStatus!=='READY'){
+    try{if(navigator.vibrate)navigator.vibrate([250,120,250])}catch(e){}
+    alert('🎉 Your food is ready! Please collect order '+order.order_number+'.');
+  }
+  lastStatus=order.status;
+}
+
+async function pollStatus(){
+  if(!trackingToken)return;
+  try{
+    const r=await fetch('/api/restaurant/online-order/status?store_id='+encodeURIComponent(STORE)+'&token='+encodeURIComponent(trackingToken)+'&t='+Date.now(),{cache:'no-store'});
+    const j=await r.json();
+    if(r.ok&&j.success){showStatus(j.order,j.message);if(['COLLECTED','CANCELLED'].includes(j.order.status)){clearInterval(statusTimer);statusTimer=null}}
+  }catch(e){console.error('Order status error',e)}
+}
+
+async function placeOrder(){
+  if(!cart.length)return alert('Choose something first.');
+  const button=document.getElementById('send');button.disabled=true;button.textContent='PLACING ORDER...';
+  try{
+    const r=await fetch('/api/restaurant/orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({store_id:STORE,source:'ONLINE',customer_name:document.getElementById('name').value,items:cart.map(x=>({menu_id:x.id,quantity:x.qty}))})});
+    const j=await r.json();
+    if(!r.ok||!j.success)throw new Error(j.message||'Could not place order.');
+    trackingToken=j.customer_token;lastStatus=null;
+    document.getElementById('result').innerHTML=`<div class="card"><h2>Order received</h2><h1>${esc(j.order_number)}</h1><p>Total: <b>${money(j.total)}</b></p><p>Pay at the cashier. Keep this page open to receive live messages when your order is being prepared and when it is ready.</p><div class="receipt-row"><button class="btn green" id="receiptBtn">📄 Download PDF Receipt</button></div></div>`;
+    document.getElementById('receiptBtn').onclick=()=>downloadReceipt(trackingToken);
+    cart=[];render();
+    await downloadReceipt(trackingToken);
+    await pollStatus();
+    if(statusTimer)clearInterval(statusTimer);
+    statusTimer=setInterval(pollStatus,5000);
+  }catch(e){alert(e.message)}finally{button.disabled=false;button.textContent='PLACE ORDER — PAY AT CASHIER'}
+}
+document.getElementById('send').onclick=placeOrder;
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+load();render();
+</script>
+</body>
+</html>
