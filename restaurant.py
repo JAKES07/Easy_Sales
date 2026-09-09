@@ -292,6 +292,21 @@ def add_menu():
         c.commit(); c.close(); return jsonify({'success':True,'id':mid})
     except Exception: return jsonify({'success':False,'message':'Enter valid menu details and recipe quantities.'}),400
 
+@restaurant_bp.route('/api/restaurant/menu/<int:mid>',methods=['DELETE'])
+def delete_menu(mid):
+    d=request.get_json(silent=True) or {}
+    store_id=str(d.get('store_id','')).upper()
+    c=conn(store_id)
+    row=c.execute('SELECT id FROM restaurant_menu WHERE id=?',(mid,)).fetchone()
+    if not row:
+        c.close()
+        return jsonify({'success':False,'message':'Menu item not found.'}),404
+    # Soft-delete so existing orders/reports remain intact.
+    c.execute('UPDATE restaurant_menu SET active=0,updated_at=? WHERE id=?',(now(),mid))
+    c.execute('DELETE FROM restaurant_recipe_items WHERE menu_id=?',(mid,))
+    c.commit(); c.close()
+    return jsonify({'success':True})
+
 @restaurant_bp.route('/api/restaurant/menu/<int:mid>',methods=['PUT'])
 def update_menu(mid):
     d=request.get_json(silent=True) or {}; store_id=str(d.get('store_id','')).upper()
