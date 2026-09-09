@@ -1,7 +1,9 @@
 import json
 import sqlite3
+import secrets
+from io import BytesIO
 from datetime import datetime
-from flask import Blueprint, render_template, request, jsonify, abort
+from flask import Blueprint, render_template, request, jsonify, abort, send_file
 from store_database import get_store_connection
 from store_controller import get_store
 
@@ -81,7 +83,8 @@ def init_restaurant_db(store_id):
       total REAL NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL,
       paid_at TEXT,
-      completed_at TEXT
+      completed_at TEXT,
+      customer_token TEXT
     );
     CREATE TABLE IF NOT EXISTS restaurant_order_items (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -120,6 +123,15 @@ def init_restaurant_db(store_id):
         c.execute("ALTER TABLE restaurant_order_items ADD COLUMN ingredient_cost REAL NOT NULL DEFAULT 0")
     except sqlite3.OperationalError:
         pass
+    try:
+        c.execute("ALTER TABLE restaurant_orders ADD COLUMN customer_token TEXT")
+    except sqlite3.OperationalError:
+        pass
+    # Give older online orders a private customer token so their status/receipt
+    # can be retrieved without exposing the order by numeric database ID.
+    rows = c.execute("SELECT id FROM restaurant_orders WHERE source='ONLINE' AND (customer_token IS NULL OR customer_token='')").fetchall()
+    for r in rows:
+        c.execute("UPDATE restaurant_orders SET customer_token=? WHERE id=?", (secrets.token_urlsafe(24), r['id']))
     c.commit(); c.close()
 
 def rowdicts(rows): return [dict(r) for r in rows]
@@ -287,10 +299,78 @@ def orders():
             if not r or qty<=0: raise ValueError('Invalid menu item.')
             lt=float(r['selling_price'])*qty; total+=lt; normalized.append((mid,r['name'],qty,float(r['selling_price']),lt,menu_cost(c,mid)))
         t=now(); order_no=f'R{datetime.now().strftime("%y%m%d")}-{int(datetime.now().timestamp())%100000:05d}'
-        cur=c.execute('INSERT INTO restaurant_orders(order_number,source,status,customer_name,total,created_at) VALUES(?,?,?,?,?,?)',(order_no,source,'PENDING_PAYMENT',customer,total,t)); oid=cur.lastrowid
+        customer_token = secrets.token_urlsafe(24) if source.upper() == 'ONLINE' else None
+        cur=c.execute('INSERT INTO restaurant_orders(order_number,source,status,customer_name,total,created_at,customer_token) VALUES(?,?,?,?,?,?,?)',(order_no,source,'PENDING_PAYMENT',customer,total,t,customer_token)); oid=cur.lastrowid
         for x in normalized: c.execute('INSERT INTO restaurant_order_items(order_id,menu_id,product_name,quantity,unit_price,line_total,ingredient_cost) VALUES(?,?,?,?,?,?,?)',(oid,*x))
-        c.commit(); c.close(); return jsonify({'success':True,'order_number':order_no,'order_id':oid,'total':total,'status':'PENDING_PAYMENT'})
+        c.commit(); c.close(); return jsonify({'success':True,'order_number':order_no,'order_id':oid,'total':total,'status':'PENDING_PAYMENT','customer_token':customer_token})
     except Exception as e: c.close(); return jsonify({'success':False,'message':str(e)}),400
+
+@restaurant_bp.route('/api/restaurant/online-order/status')
+def online_order_status():
+    store_id=str(request.args.get('store_id') or '').upper()
+    token=str(request.args.get('token') or '').strip()
+    if not store_id or not token:
+        return jsonify({'success':False,'message':'Order tracking information is required.'}),400
+    c=conn(store_id)
+    order=c.execute('SELECT id,order_number,status,customer_name,total,created_at FROM restaurant_orders WHERE source="ONLINE" AND customer_token=?',(token,)).fetchone()
+    if not order:
+        c.close(); return jsonify({'success':False,'message':'Online order not found.'}),404
+    messages={
+        'PENDING_PAYMENT':'Order received. Please pay at the cashier.',
+        'PAID':'Payment received. Your order is waiting for the kitchen.',
+        'ACCEPTED':'Your order has been accepted by the restaurant.',
+        'PREPARING':'Your food is being prepared.',
+        'READY':'🎉 Your food is ready! Please collect your order.',
+        'COLLECTED':'Your order has been collected. Thank you!',
+        'CANCELLED':'Your order was cancelled. Please speak to the restaurant.'
+    }
+    c.close()
+    return jsonify({'success':True,'order':dict(order),'message':messages.get(order['status'],'Your order is being processed.')})
+
+@restaurant_bp.route('/api/restaurant/online-order/receipt')
+def online_order_receipt():
+    store_id=str(request.args.get('store_id') or '').upper()
+    token=str(request.args.get('token') or '').strip()
+    if not store_id or not token:
+        return jsonify({'success':False,'message':'Receipt information is required.'}),400
+    c=conn(store_id)
+    order=c.execute('SELECT * FROM restaurant_orders WHERE source="ONLINE" AND customer_token=?',(token,)).fetchone()
+    if not order:
+        c.close(); return jsonify({'success':False,'message':'Online order not found.'}),404
+    items=c.execute('SELECT product_name,quantity,unit_price,line_total FROM restaurant_order_items WHERE order_id=? ORDER BY id',(order['id'],)).fetchall()
+    store=get_store(store_id)
+    c.close()
+
+    # Generate a compact PDF receipt on demand. The customer page automatically
+    # downloads it after placing an online order. Mobile browsers may still ask
+    # the user to confirm the download depending on device/browser settings.
+    from reportlab.lib.pagesizes import A5
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.units import mm
+
+    buf=BytesIO()
+    pdf=canvas.Canvas(buf,pagesize=A5)
+    width,height=A5
+    x=15*mm; y=height-15*mm
+    name=(store['store_name'] if store else 'Easy_Sales Restaurant')
+    pdf.setFont('Helvetica-Bold',15); pdf.drawString(x,y,str(name)[:55]); y-=8*mm
+    pdf.setFont('Helvetica',9); pdf.drawString(x,y,'ONLINE ORDER RECEIPT'); y-=6*mm
+    pdf.drawString(x,y,'Order: '+str(order['order_number'])); y-=5*mm
+    pdf.drawString(x,y,'Date: '+str(order['created_at'])); y-=5*mm
+    if order['customer_name']:
+        pdf.drawString(x,y,'Customer: '+str(order['customer_name'])[:45]); y-=7*mm
+    pdf.line(x,y,width-x,y); y-=6*mm
+    for item in items:
+        label=f"{item['product_name']} x {item['quantity']:g}"
+        pdf.drawString(x,y,label[:45]); pdf.drawRightString(width-x,y,f"R{float(item['line_total']):.2f}"); y-=5*mm
+        if y<25*mm:
+            pdf.showPage(); y=height-15*mm; pdf.setFont('Helvetica',9)
+    y-=2*mm; pdf.line(x,y,width-x,y); y-=6*mm
+    pdf.setFont('Helvetica-Bold',12); pdf.drawString(x,y,'TOTAL'); pdf.drawRightString(width-x,y,f"R{float(order['total']):.2f}"); y-=8*mm
+    pdf.setFont('Helvetica',9); pdf.drawString(x,y,'Status: '+str(order['status'])); y-=7*mm
+    pdf.drawString(x,y,'Thank you for ordering with Easy_Sales.')
+    pdf.save(); buf.seek(0)
+    return send_file(buf,mimetype='application/pdf',as_attachment=True,download_name=f"Easy_Sales_{order['order_number']}.pdf")
 
 @restaurant_bp.route('/api/restaurant/orders/<int:oid>/pay',methods=['POST'])
 def pay_order(oid):
