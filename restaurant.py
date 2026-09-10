@@ -1,6 +1,9 @@
 import json
 import sqlite3
 import secrets
+import os
+import hmac
+import hashlib
 from io import BytesIO
 from datetime import datetime
 from flask import Blueprint, render_template, request, jsonify, abort, send_file
@@ -11,6 +14,31 @@ restaurant_bp = Blueprint('restaurant', __name__)
 
 def now():
     return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+
+def kitchen_token(store_id):
+    """Create a stable, non-guessable kitchen-screen token for a store.
+
+    The token is derived from the Easy Sales secret key and the Store ID, so
+    it does not need to be stored in the restaurant database. It lets an
+    authorised owner open the Kitchen Screen on a separate device without
+    exposing the normal Store Access session.
+    """
+    sid = str(store_id or '').strip().upper()
+    secret = os.environ.get(
+        'EASY_SALES_SECRET_KEY',
+        'easy-sales-local-development-change-this-before-production'
+    )
+    return hmac.new(
+        secret.encode('utf-8'),
+        ('EASY_SALES_KITCHEN:' + sid).encode('utf-8'),
+        hashlib.sha256
+    ).hexdigest()
+
+
+def valid_kitchen_token(store_id, token):
+    expected = kitchen_token(store_id)
+    return bool(token) and hmac.compare_digest(str(token), expected)
 
 def enabled(store_id):
     """Return whether the Restaurant add-on is enabled for this store.
@@ -222,15 +250,100 @@ def owner_page():
     store_id = str(session.get('store_id') or store_id or '').upper()
     if not enabled(store_id): return ('Restaurant Mode is not enabled for this store.',404)
     init_restaurant_db(store_id)
-    return render_template('restaurant.html', store_id=store_id, store=get_store(store_id))
+    return render_template(
+        'restaurant.html',
+        store_id=store_id,
+        store=get_store(store_id),
+        kitchen_token=kitchen_token(store_id)
+    )
 
 @restaurant_bp.route('/restaurant/kitchen')
 def kitchen_page():
     from flask import session
-    store_id=str(session.get('store_id') or request.args.get('store_id') or '').upper()
-    if not enabled(store_id): return ('Restaurant Mode is not enabled for this store.',404)
+    session_store = str(session.get('store_id') or '').strip().upper()
+    requested_store = str(request.args.get('store_id') or '').strip().upper()
+    store_id = session_store or requested_store
+    token = str(request.args.get('token') or '').strip()
+
+    if not store_id or not enabled(store_id):
+        return ('Restaurant Mode is not enabled for this store.', 404)
+
+    # On the owner's device the normal Store Access session is enough.
+    # On a second device the signed kitchen token in the shared URL is used.
+    if not session_store and not valid_kitchen_token(store_id, token):
+        return ('Kitchen Screen access is required. Open the Kitchen Screen link from the restaurant system.', 403)
+
     init_restaurant_db(store_id)
-    return render_template('restaurant_kitchen.html', store_id=store_id)
+    return render_template(
+        'restaurant_kitchen.html',
+        store_id=store_id,
+        kitchen_token=kitchen_token(store_id)
+    )
+
+
+def _public_kitchen_authorised(store_id, token):
+    sid = str(store_id or '').strip().upper()
+    if not sid or not enabled(sid):
+        return False
+    return valid_kitchen_token(sid, token)
+
+
+@restaurant_bp.route('/api/restaurant/kitchen/orders')
+def kitchen_orders():
+    store_id = str(request.args.get('store_id') or '').strip().upper()
+    token = str(request.args.get('token') or '').strip()
+    if not _public_kitchen_authorised(store_id, token):
+        return jsonify({'success': False, 'message': 'Kitchen Screen access is required.'}), 403
+
+    c = conn(store_id)
+    init_restaurant_db(store_id)
+    rows = c.execute(
+        "SELECT * FROM restaurant_orders ORDER BY id DESC LIMIT 100"
+    ).fetchall()
+    out = []
+    for r in rows:
+        d = dict(r)
+        d['items'] = rowdicts(
+            c.execute(
+                'SELECT * FROM restaurant_order_items WHERE order_id=?',
+                (r['id'],)
+            ).fetchall()
+        )
+        out.append(d)
+    c.close()
+    return jsonify({'success': True, 'orders': out})
+
+
+@restaurant_bp.route('/api/restaurant/kitchen/orders/<int:oid>/status', methods=['POST'])
+def kitchen_order_status(oid):
+    d = request.get_json(silent=True) or {}
+    store_id = str(d.get('store_id') or '').strip().upper()
+    token = str(d.get('token') or '').strip()
+    status = str(d.get('status') or '').upper()
+
+    if not _public_kitchen_authorised(store_id, token):
+        return jsonify({'success': False, 'message': 'Kitchen Screen access is required.'}), 403
+
+    allowed = {'ACCEPTED', 'PREPARING', 'READY', 'COLLECTED', 'CANCELLED'}
+    if status not in allowed:
+        return jsonify({'success': False, 'message': 'Invalid status.'}), 400
+
+    c = conn(store_id)
+    r = c.execute(
+        'SELECT * FROM restaurant_orders WHERE id=?',
+        (oid,)
+    ).fetchone()
+    if not r:
+        c.close()
+        return jsonify({'success': False, 'message': 'Order not found.'}), 404
+
+    c.execute(
+        'UPDATE restaurant_orders SET status=?, completed_at=CASE WHEN ? IN (\"COLLECTED\",\"CANCELLED\") THEN ? ELSE completed_at END WHERE id=?',
+        (status, status, now(), oid)
+    )
+    c.commit()
+    c.close()
+    return jsonify({'success': True})
 
 @restaurant_bp.route('/r/<store_id>')
 def customer_page(store_id):
