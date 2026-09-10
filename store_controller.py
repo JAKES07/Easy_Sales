@@ -110,6 +110,80 @@ def _ensure_column(cursor, table_name, column_name, definition):
 # STORE ID / PASSKEY GENERATION
 # ============================================================
 
+def _subscription_expiry_from(start_dt):
+    """Return a 30-day subscription expiry timestamp from a datetime."""
+    from datetime import timedelta
+    return (start_dt + timedelta(days=30)).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def subscription_status(store):
+    """Return current 30-day subscription information without changing data."""
+    if store is None:
+        return {"active": False, "started_at": None, "expires_at": None, "days_remaining": 0}
+
+    expires = store["subscription_expires_at"]
+    started = store["subscription_started_at"]
+    active_flag = bool(store["subscription_active"])
+    days_remaining = 0
+
+    if expires:
+        try:
+            expiry_dt = datetime.strptime(expires, "%Y-%m-%d %H:%M:%S")
+            seconds = (expiry_dt - datetime.now()).total_seconds()
+            if seconds > 0:
+                days_remaining = max(1, int((seconds + 86399) // 86400))
+            else:
+                active_flag = False
+        except ValueError:
+            active_flag = False
+
+    return {
+        "active": active_flag,
+        "started_at": started,
+        "expires_at": expires,
+        "days_remaining": days_remaining,
+    }
+
+
+def activate_30_day_subscription(store_id):
+    """Start/restart a 30-day subscription for one store."""
+    sid = str(store_id).strip().upper()
+    started = datetime.now()
+    expires = _subscription_expiry_from(started)
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        UPDATE stores
+        SET subscription_active=1, subscription_started_at=?, subscription_expires_at=?
+        WHERE store_id=?
+    """, (started.strftime("%Y-%m-%d %H:%M:%S"), expires, sid))
+    if cur.rowcount == 0:
+        conn.close()
+        raise ValueError("Store not found.")
+    cur.execute("""
+        INSERT INTO store_activity (store_id, action, description, created_at)
+        VALUES (?, ?, ?, ?)
+    """, (sid, "SUBSCRIPTION_30_DAYS", "30-day subscription activated", now()))
+    conn.commit()
+    conn.close()
+    return expires
+
+
+def deactivate_subscription(store_id):
+    """Turn off subscription access without changing the store account or data."""
+    sid = str(store_id).strip().upper()
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("UPDATE stores SET subscription_active=0 WHERE store_id=?", (sid,))
+    if cur.rowcount == 0:
+        conn.close()
+        raise ValueError("Store not found.")
+    cur.execute("""INSERT INTO store_activity (store_id, action, description, created_at)
+                   VALUES (?, ?, ?, ?)""", (sid, "SUBSCRIPTION_DISABLED", "Subscription disabled", now()))
+    conn.commit()
+    conn.close()
+
+
 def generate_store_id():
     return "ES-" + secrets.token_hex(4).upper()
 
@@ -162,7 +236,10 @@ def init_controller():
             employee_mode_feature_enabled INTEGER NOT NULL DEFAULT 0,
             employee_mode_active INTEGER NOT NULL DEFAULT 0,
             employee_mode_password_hash TEXT,
-            restaurant_mode_enabled INTEGER NOT NULL DEFAULT 0
+            restaurant_mode_enabled INTEGER NOT NULL DEFAULT 0,
+            subscription_active INTEGER NOT NULL DEFAULT 0,
+            subscription_started_at TEXT,
+            subscription_expires_at TEXT
         )
     """)
 
@@ -171,6 +248,9 @@ def init_controller():
     _ensure_column(cur, "stores", "employee_mode_active", "INTEGER NOT NULL DEFAULT 0")
     _ensure_column(cur, "stores", "employee_mode_password_hash", "TEXT")
     _ensure_column(cur, "stores", "restaurant_mode_enabled", "INTEGER NOT NULL DEFAULT 0")
+    _ensure_column(cur, "stores", "subscription_active", "INTEGER NOT NULL DEFAULT 0")
+    _ensure_column(cur, "stores", "subscription_started_at", "TEXT")
+    _ensure_column(cur, "stores", "subscription_expires_at", "TEXT")
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS store_activity (
@@ -221,6 +301,28 @@ def init_controller():
                 "Initial store space created",
                 now()
             ))
+
+    # Backfill the original 30-day subscription for existing ACTIVE stores
+    # that were created before subscription fields existed. Never overwrite
+    # an already configured subscription.
+    rows = cur.execute("""
+        SELECT store_id, activated_at FROM stores
+        WHERE status='ACTIVE'
+          AND (subscription_started_at IS NULL OR subscription_expires_at IS NULL)
+    """).fetchall()
+    for row in rows:
+        if row["activated_at"]:
+            try:
+                started = datetime.strptime(row["activated_at"], "%Y-%m-%d %H:%M:%S")
+                expires = _subscription_expiry_from(started)
+                cur.execute("""
+                    UPDATE stores
+                    SET subscription_active=?, subscription_started_at=?, subscription_expires_at=?
+                    WHERE store_id=?
+                """, (1 if datetime.now() < datetime.strptime(expires, "%Y-%m-%d %H:%M:%S") else 0,
+                      started.strftime("%Y-%m-%d %H:%M:%S"), expires, row["store_id"]))
+            except ValueError:
+                pass
 
     conn.commit()
     conn.close()
@@ -553,6 +655,7 @@ def activate_store(store_id):
     conn = get_connection()
     cur = conn.cursor()
 
+    activation_time = now()
     cur.execute("""
         UPDATE stores
         SET status='ACTIVE',
@@ -560,7 +663,7 @@ def activate_store(store_id):
             deactivated_at=NULL
         WHERE store_id=?
     """, (
-        now(),
+        activation_time,
         store_id
     ))
 
@@ -571,6 +674,21 @@ def activate_store(store_id):
         raise ValueError(
             "Store not found."
         )
+
+    # A brand-new/never-subscribed store receives its 30-day subscription
+    # when first activated. Re-activating a store does NOT silently renew it.
+    existing = cur.execute("""
+        SELECT subscription_started_at, subscription_expires_at
+        FROM stores WHERE store_id=?
+    """, (store_id,)).fetchone()
+    if existing and not existing["subscription_started_at"]:
+        started = datetime.strptime(activation_time, "%Y-%m-%d %H:%M:%S")
+        expires = _subscription_expiry_from(started)
+        cur.execute("""
+            UPDATE stores
+            SET subscription_active=1, subscription_started_at=?, subscription_expires_at=?
+            WHERE store_id=?
+        """, (activation_time, expires, store_id))
 
     cur.execute("""
         INSERT INTO store_activity
@@ -762,6 +880,10 @@ def check_access(store_id, passkey):
     if store["status"] != "ACTIVE":
 
         return False, "STORE_INACTIVE"
+
+    if not subscription_status(store)["active"]:
+
+        return False, "SUBSCRIPTION_EXPIRED"
 
     return True, "ACCESS_GRANTED"
 
