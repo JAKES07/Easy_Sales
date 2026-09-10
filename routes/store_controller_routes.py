@@ -25,6 +25,9 @@ from store_controller import (
     reset_employee_mode_password,
     set_restaurant_mode,
     get_restaurant_mode,
+    activate_30_day_subscription,
+    deactivate_subscription,
+    subscription_status,
 )
 
 from controller_auth import (
@@ -467,6 +470,32 @@ def reset_store_data(store_id):
     return redirect(
         url_for("controller.dashboard")
     )
+
+
+# ============================================================
+# 30-DAY SUBSCRIPTION
+# ============================================================
+
+@controller_bp.route("/subscription/activate/<store_id>", methods=["POST"])
+@controller_login_required
+def activate_subscription(store_id):
+    try:
+        expiry = activate_30_day_subscription(store_id.upper())
+        flash(f"30-day subscription activated for {store_id.upper()}. Expires: {expiry}.", "success")
+    except Exception as error:
+        flash(str(error), "error")
+    return redirect(url_for("controller.store_details", store_id=store_id.upper()))
+
+
+@controller_bp.route("/subscription/disable/<store_id>", methods=["POST"])
+@controller_login_required
+def disable_subscription(store_id):
+    try:
+        deactivate_subscription(store_id.upper())
+        flash(f"Subscription disabled for {store_id.upper()}.", "success")
+    except Exception as error:
+        flash(str(error), "error")
+    return redirect(url_for("controller.store_details", store_id=store_id.upper()))
 
 
 # ============================================================
