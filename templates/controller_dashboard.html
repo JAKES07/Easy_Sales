@@ -317,6 +317,13 @@
 
                 {% endif %}
 
+                {% if store["subscription_active"] and store["subscription_expires_at"] %}
+                    <div class="status active">💳 SUBSCRIPTION ACTIVE</div>
+                    <div class="client">Expires {{ store["subscription_expires_at"] }}</div>
+                {% else %}
+                    <div class="status inactive">💳 SUBSCRIPTION INACTIVE</div>
+                {% endif %}
+
 
                 <div class="actions">
 
