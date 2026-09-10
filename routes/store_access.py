@@ -65,6 +65,16 @@ def store_access_login():
                 )
             }), 403
 
+        if result == "SUBSCRIPTION_EXPIRED":
+            return jsonify({
+                "success": False,
+                "code": "SUBSCRIPTION_EXPIRED",
+                "message": (
+                    "This store's 30-day subscription has expired. "
+                    "Please contact Easy Sales to renew access."
+                )
+            }), 403
+
         if result == "INVALID_PASSKEY":
             return jsonify({
                 "success": False,
