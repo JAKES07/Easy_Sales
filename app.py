@@ -436,6 +436,11 @@ def enforce_store_access():
     if request.path.startswith("/r/"):
         return None
 
+    # The Kitchen Screen page may be opened on a separate device using its
+    # private store token. The page itself validates that token.
+    if request.path == "/restaurant/kitchen":
+        return None
+
     if request.path == "/api/restaurant/bootstrap":
         return None
 
