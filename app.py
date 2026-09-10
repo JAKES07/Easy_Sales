@@ -441,7 +441,16 @@ def enforce_store_access():
 
     if request.path in (
         "/api/restaurant/online-order/status",
-        "/api/restaurant/online-order/receipt"
+        "/api/restaurant/online-order/receipt",
+        "/api/restaurant/kitchen/orders"
+    ):
+        return None
+
+    # The public Kitchen Screen uses a signed per-store token. The endpoint
+    # itself validates that token before returning orders or changing status.
+    if (
+        request.path.startswith("/api/restaurant/kitchen/orders/")
+        and request.method == "POST"
     ):
         return None
 
