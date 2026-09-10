@@ -193,6 +193,39 @@
         </div>
 
         <div class="row">
+            <div class="label">SUBSCRIPTION</div>
+            <div class="feature-box">
+                {% set sub = namespace(active=false, days=0, started=None, expires=None) %}
+                {% if store["subscription_active"] and store["subscription_expires_at"] %}
+                    {% set sub.active = true %}
+                    {% set sub.started = store["subscription_started_at"] %}
+                    {% set sub.expires = store["subscription_expires_at"] %}
+                {% endif %}
+
+                {% if sub.active %}
+                    <div class="feature-status active">● SUBSCRIPTION ACTIVE — 30 DAYS</div>
+                    <p class="feature-note"><strong>Started:</strong> {{ sub.started or "Not recorded" }}</p>
+                    <p class="feature-note"><strong>Expires:</strong> {{ sub.expires }}</p>
+                    <form action="{{ url_for('controller.activate_subscription', store_id=store['store_id']) }}" method="POST" style="display:inline;">
+                        <button type="submit" class="btn-feature btn-enable-feature" onclick="return confirm('Restart the 30-day subscription for this store? This will set a new 30-day expiry date.');">🔄 Renew 30 Days</button>
+                    </form>
+                    <form action="{{ url_for('controller.disable_subscription', store_id=store['store_id']) }}" method="POST" style="display:inline;">
+                        <button type="submit" class="btn-feature btn-disable-feature" onclick="return confirm('Disable the subscription for this store?');">Disable Subscription</button>
+                    </form>
+                {% else %}
+                    <div class="feature-status inactive">● SUBSCRIPTION INACTIVE / EXPIRED</div>
+                    {% if store["subscription_started_at"] %}
+                        <p class="feature-note"><strong>Previous expiry:</strong> {{ store["subscription_expires_at"] or "Not recorded" }}</p>
+                    {% endif %}
+                    <p class="feature-note">Activate the store's 30-day subscription here. Resetting store data will not affect this subscription.</p>
+                    <form action="{{ url_for('controller.activate_subscription', store_id=store['store_id']) }}" method="POST">
+                        <button type="submit" class="btn-feature btn-enable-feature">🟢 Activate 30-Day Subscription</button>
+                    </form>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="row">
             <div class="label">EMPLOYEE MODE ADD-ON</div>
             <div class="feature-box">
                 {% if store["employee_mode_feature_enabled"] %}
